@@ -1,3 +1,4 @@
+import { SignInButton, SignInModal } from "./modules/auth";
 import "./App.css";
 
 function App() {
@@ -17,7 +18,7 @@ function App() {
         >
           iconwerk.
         </div>
-        <nav className="flex gap-7">
+        <nav className="flex items-center gap-7">
           {["Work", "Services", "About", "Contact"].map((item) => (
             <a
               key={item}
@@ -28,6 +29,7 @@ function App() {
               {item}
             </a>
           ))}
+          <SignInButton />
         </nav>
       </header>
 
@@ -297,6 +299,8 @@ function App() {
         </div>
 
       </main>
+
+      <SignInModal />
 
       {/* ── FOOTER ── */}
       <footer
