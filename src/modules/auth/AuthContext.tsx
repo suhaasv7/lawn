@@ -11,6 +11,7 @@ interface AuthContextType {
   showSignIn: boolean;
   openSignIn: () => void;
   closeSignIn: () => void;
+  logout: () => void;
   handleGoogleSuccess: (response: CredentialResponse) => void;
 }
 
@@ -48,6 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         showSignIn,
         openSignIn: () => setShowSignIn(true),
         closeSignIn: () => setShowSignIn(false),
+        logout: () => {
+          localStorage.removeItem("user");
+          setUser(null);
+        },
         handleGoogleSuccess,
       }}
     >
