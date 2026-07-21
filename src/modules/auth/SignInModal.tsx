@@ -28,7 +28,6 @@ export function SignInModal() {
         </h2>
         <p
           className="text-[0.78rem] opacity-60 mb-8"
-          style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
         >
           Continue with your Google account
         </p>

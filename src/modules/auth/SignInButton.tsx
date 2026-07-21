@@ -32,7 +32,7 @@ export function SignInButton() {
           />
           <span
             className="text-[0.8rem] uppercase"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "1px" }}
+            style={{ letterSpacing: "1px" }}
           >
             {user.name}
           </span>
@@ -48,7 +48,7 @@ export function SignInButton() {
                 setDropdownOpen(false);
               }}
               className="w-full text-left px-4 py-3 uppercase text-[0.75rem] hover:bg-[#1a1a1a] hover:text-[#f5f0e8] transition-colors cursor-pointer bg-transparent border-none"
-              style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "1px" }}
+              style={{ letterSpacing: "1px" }}
             >
               Sign Out
             </button>
@@ -62,7 +62,7 @@ export function SignInButton() {
     <button
       onClick={openSignIn}
       className="border-[1.5px] border-[#2b2b2b] px-5 py-1.5 uppercase text-[0.8rem] bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#f5f0e8] hover:text-[#1a1a1a] transition-colors cursor-pointer"
-      style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "1px" }}
+      style={{ letterSpacing: "1px" }}
     >
       Sign In
     </button>

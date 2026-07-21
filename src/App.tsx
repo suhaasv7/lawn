@@ -5,7 +5,7 @@ function App() {
   return (
     <div
       className="min-h-screen p-6"
-      style={{ backgroundColor: "#f5f0e8", fontFamily: "'Space Grotesk', Arial, sans-serif" }}
+      style={{ backgroundColor: "#f5f0e8" }}
     >
       {/* ── NAV ── */}
       <header
@@ -14,7 +14,7 @@ function App() {
       >
         <div
           className="text-[1.1rem] font-medium"
-          style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "-0.5px" }}
+          style={{ letterSpacing: "-0.5px" }}
         >
           lawn.
         </div>
@@ -24,7 +24,7 @@ function App() {
               key={item}
               href="#"
               className="text-[#1a1a1a] no-underline uppercase text-[0.8rem] hover:underline"
-              style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "1px" }}
+              style={{ letterSpacing: "1px" }}
             >
               {item}
             </a>
@@ -52,14 +52,13 @@ function App() {
             </h1>
             <p
               className="text-[0.85rem] leading-relaxed opacity-70 max-w-[340px]"
-              style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
             >
               Connecting you with trusted legal professionals for advice, representation, and peace of mind.
             </p>
           </div>
           <div
             className="text-[0.7rem] uppercase opacity-40 mt-auto"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "3px" }}
+            style={{ letterSpacing: "3px" }}
           >
             Est. 2024 — Legal Services
           </div>
@@ -85,7 +84,7 @@ function App() {
         >
           <span
             className="border-[1.5px] border-[#f5f0e8] px-7 py-2.5 uppercase text-[1rem] hover:bg-[#f5f0e8] hover:text-[#2c3e8c] transition-colors"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "1px" }}
+            style={{ letterSpacing: "1px" }}
           >
             Get Counsel →
           </span>
@@ -95,7 +94,7 @@ function App() {
         <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] p-6 bg-[#2c3e8c] text-[#f5f0e8]">
           <div
             className="text-[0.65rem] uppercase mb-4"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "2px", color: "rgba(245,240,232,0.5)" }}
+            style={{ letterSpacing: "2px", color: "rgba(245,240,232,0.5)" }}
           >
             Practice Areas
           </div>
@@ -104,7 +103,6 @@ function App() {
               <li
                 key={s}
                 className="flex justify-between items-center py-2 border-b border-[rgba(245,240,232,0.15)] last:border-b-0 text-[0.78rem]"
-                style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
               >
                 {s} <span className="opacity-50">→</span>
               </li>
@@ -133,7 +131,7 @@ function App() {
           <div className="text-[4.5rem] font-light leading-none opacity-35">§</div>
           <div
             className="text-[0.65rem] uppercase mt-4"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "2px", color: "rgba(245,240,232,0.4)" }}
+            style={{ letterSpacing: "2px", color: "rgba(245,240,232,0.4)" }}
           >
             Section of Law
           </div>
@@ -149,7 +147,6 @@ function App() {
           </h2>
           <p
             className="text-[0.8rem] opacity-60 leading-relaxed"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
           >
             Navigating complex legal landscapes with precision, integrity, and a commitment to protecting your rights at every step.
           </p>
@@ -159,14 +156,13 @@ function App() {
         <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] p-6" style={{ backgroundColor: "#ece7db" }}>
           <div
             className="text-[0.65rem] uppercase mb-2"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "2px", color: "#777" }}
+            style={{ letterSpacing: "2px", color: "#777" }}
           >
             Cases
           </div>
           <div className="text-[3rem] font-bold leading-none" style={{ letterSpacing: "-2px" }}>500+</div>
           <div
             className="text-[0.75rem] opacity-60 mt-2"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
           >
             Successfully resolved
           </div>
@@ -183,7 +179,7 @@ function App() {
                 <span
                   key={`${j}-${i}`}
                   className="px-10 opacity-50 uppercase text-[0.85rem]"
-                  style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "3px" }}
+                  style={{ letterSpacing: "3px" }}
                 >
                   {t} ★
                 </span>
@@ -201,7 +197,6 @@ function App() {
             <h3 className="text-[1.1rem] font-semibold mb-1.5">Built on principle.</h3>
             <p
               className="text-[0.78rem] opacity-60 leading-relaxed"
-              style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
             >
               A dedicated practice committed to upholding justice. Every case is handled with care, every client treated with respect.
             </p>
@@ -212,7 +207,7 @@ function App() {
         <div className="card col-span-2 row-span-1 border-2 border-[#2b2b2b] p-6" style={{ backgroundColor: "#ece7db" }}>
           <div
             className="text-[0.65rem] uppercase mb-4"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "2px", color: "#777" }}
+            style={{ letterSpacing: "2px", color: "#777" }}
           >
             Process
           </div>
@@ -225,14 +220,13 @@ function App() {
               <div key={step.num} className="flex-1 border border-[#2b2b2b] p-4 flex flex-col gap-2">
                 <div
                   className="text-[0.65rem] opacity-40"
-                  style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "2px" }}
+                  style={{ letterSpacing: "2px" }}
                 >
                   {step.num}
                 </div>
                 <div className="font-semibold text-[0.95rem]">{step.title}</div>
                 <div
                   className="text-[0.7rem] opacity-50 leading-snug"
-                  style={{ fontFamily: "'DM Mono', 'Courier New', monospace" }}
                 >
                   {step.desc}
                 </div>
@@ -285,14 +279,14 @@ function App() {
         <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] p-6 bg-[#3a6b35] text-[#f5f0e8] flex flex-col justify-between">
           <div
             className="text-[0.7rem] uppercase opacity-60"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "2px" }}
+            style={{ letterSpacing: "2px" }}
           >
             Established
           </div>
           <div className="text-[2.8rem] font-bold" style={{ letterSpacing: "-2px" }}>2024</div>
           <div
             className="text-[0.7rem] uppercase opacity-60"
-            style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "2px" }}
+            style={{ letterSpacing: "2px" }}
           >
             Legal Practice
           </div>
@@ -309,13 +303,13 @@ function App() {
       >
         <span
           className="text-[0.72rem] opacity-50"
-          style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "1px" }}
+          style={{ letterSpacing: "1px" }}
         >
           &copy; 2024 lawn. All rights reserved.
         </span>
         <span
           className="text-[0.72rem] opacity-50"
-          style={{ fontFamily: "'DM Mono', 'Courier New', monospace", letterSpacing: "1px" }}
+          style={{ letterSpacing: "1px" }}
         >
           Justice with precision.
         </span>

@@ -1,4 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@200..700&display=swap');
+
+/* ── one font, everywhere ── */
+html,
+body,
+*,
+*::before,
+*::after {
+  font-family: 'Cascadia Code', 'Courier New', monospace !important;
+}
 
 /* ── ticker animation ── */
 @keyframes ticker {
