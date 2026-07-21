@@ -5,12 +5,12 @@ function App() {
   return (
     <div
       className="min-h-screen p-6"
-      style={{ backgroundColor: "#f5f0e8" }}
+      style={{ backgroundColor: "#100f0d", color: "#ece7db" }}
     >
       {/* ── NAV ── */}
       <header
-        className="flex justify-between items-center border-2 border-[#2b2b2b] px-5 py-3 mb-6 max-w-[1200px] mx-auto"
-        style={{ backgroundColor: "#ece7db" }}
+        className="flex justify-between items-center border-2 border-[#3d3830] px-5 py-3 mb-6 max-w-[1200px] mx-auto"
+        style={{ backgroundColor: "#1b1917" }}
       >
         <div
           className="text-[1.1rem] font-medium"
@@ -23,7 +23,7 @@ function App() {
             <a
               key={item}
               href="#"
-              className="text-[#1a1a1a] no-underline uppercase text-[0.8rem] hover:underline"
+              className="text-[#ece7db] no-underline uppercase text-[0.8rem] hover:underline"
               style={{ letterSpacing: "1px" }}
             >
               {item}
@@ -38,10 +38,10 @@ function App() {
 
         {/* HERO — span 2x2 */}
         <div
-          className="card col-span-2 row-span-2 border-2 border-[#2b2b2b] p-10 flex flex-col justify-between bg-[#1a1a1a] text-[#f5f0e8]"
+          className="card col-span-2 row-span-2 border-2 border-[#3d3830] p-10 flex flex-col justify-between bg-[#ece7db] text-[#16150f]"
         >
           <div>
-            <div className="w-16 h-16 border-3 border-[#f5f0e8] rounded-[14px] flex items-center justify-center text-[28px] mb-6">
+            <div className="w-16 h-16 border-3 border-[#16150f] rounded-[14px] flex items-center justify-center text-[28px] mb-6">
               &#9878;
             </div>
             <h1
@@ -65,7 +65,7 @@ function App() {
         </div>
 
         {/* RED ICON GRID — Law Icons */}
-        <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] grid grid-cols-2 grid-rows-2 bg-[#c0392b] p-0 overflow-hidden">
+        <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] grid grid-cols-2 grid-rows-2 bg-[#8f2e22] p-0 overflow-hidden">
           {[
             <svg viewBox="0 0 48 48" key="i1"><path d="M24 6v30M14 12h20M10 36h28" /><path d="M14 12l-4 24M34 12l4 24" /></svg>,
             <svg viewBox="0 0 48 48" key="i2"><rect x="12" y="8" width="24" height="32" rx="2" /><line x1="17" y1="16" x2="31" y2="16" /><line x1="17" y1="22" x2="31" y2="22" /><line x1="17" y1="28" x2="25" y2="28" /></svg>,
@@ -80,10 +80,10 @@ function App() {
 
         {/* CTA — Say Hello */}
         <div
-          className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] flex items-center justify-center bg-[#2c3e8c] text-[#f5f0e8] cursor-pointer"
+          className="card col-span-1 row-span-1 border-2 border-[#3d3830] flex items-center justify-center bg-[#243070] text-[#f5f0e8] cursor-pointer"
         >
           <span
-            className="border-[1.5px] border-[#f5f0e8] px-7 py-2.5 uppercase text-[1rem] hover:bg-[#f5f0e8] hover:text-[#2c3e8c] transition-colors"
+            className="border-[1.5px] border-[#f5f0e8] px-7 py-2.5 uppercase text-[1rem] hover:bg-[#f5f0e8] hover:text-[#243070] transition-colors"
             style={{ letterSpacing: "1px" }}
           >
             Get Counsel →
@@ -91,7 +91,7 @@ function App() {
         </div>
 
         {/* SERVICES */}
-        <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] p-6 bg-[#2c3e8c] text-[#f5f0e8]">
+        <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] p-6 bg-[#243070] text-[#f5f0e8]">
           <div
             className="text-[0.65rem] uppercase mb-4"
             style={{ letterSpacing: "2px", color: "rgba(245,240,232,0.5)" }}
@@ -111,7 +111,7 @@ function App() {
         </div>
 
         {/* GREY ICON GRID — Law Icons */}
-        <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] grid grid-cols-2 grid-rows-2 bg-[#9e9e9e] p-0 overflow-hidden">
+        <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] grid grid-cols-2 grid-rows-2 bg-[#5c5850] p-0 overflow-hidden">
           {[
             <svg viewBox="0 0 40 40" key="g1"><path d="M20 4v28M12 8h16M8 32h24" /><path d="M12 8l-4 24M28 8l4 24" /></svg>,
             <svg viewBox="0 0 40 40" key="g2"><rect x="10" y="6" width="20" height="28" rx="2" /><line x1="14" y1="12" x2="26" y2="12" /><line x1="14" y1="18" x2="26" y2="18" /><line x1="14" y1="24" x2="20" y2="24" /></svg>,
@@ -125,13 +125,13 @@ function App() {
         </div>
 
         {/* TYPOGRAPHY CARD — span 2 rows */}
-        <div className="card col-span-1 row-span-2 border-2 border-[#2b2b2b] bg-[#1a1a1a] text-[#f5f0e8] flex flex-col items-center justify-center text-center gap-1 p-6">
+        <div className="card col-span-1 row-span-2 border-2 border-[#3d3830] bg-[#ece7db] text-[#16150f] flex flex-col items-center justify-center text-center gap-1 p-6">
           <div className="text-[4.5rem] font-bold leading-none opacity-35">§</div>
           <div className="text-[4.5rem] font-bold leading-none">§</div>
           <div className="text-[4.5rem] font-light leading-none opacity-35">§</div>
           <div
             className="text-[0.65rem] uppercase mt-4"
-            style={{ letterSpacing: "2px", color: "rgba(245,240,232,0.4)" }}
+            style={{ letterSpacing: "2px", color: "rgba(22,21,15,0.45)" }}
           >
             Section of Law
           </div>
@@ -139,8 +139,8 @@ function App() {
 
         {/* TAGLINE — span 2 cols */}
         <div
-          className="card col-span-2 row-span-1 border-2 border-[#2b2b2b] flex flex-col justify-center px-10 py-9"
-          style={{ backgroundColor: "#ece7db" }}
+          className="card col-span-2 row-span-1 border-2 border-[#3d3830] flex flex-col justify-center px-10 py-9"
+          style={{ backgroundColor: "#1b1917" }}
         >
           <h2 className="text-[1.7rem] font-bold leading-[1.2] mb-2.5" style={{ letterSpacing: "-0.5px" }}>
             Justice, clarity, resolve.
@@ -153,10 +153,10 @@ function App() {
         </div>
 
         {/* STATS */}
-        <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] p-6" style={{ backgroundColor: "#ece7db" }}>
+        <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] p-6" style={{ backgroundColor: "#1b1917" }}>
           <div
             className="text-[0.65rem] uppercase mb-2"
-            style={{ letterSpacing: "2px", color: "#777" }}
+            style={{ letterSpacing: "2px", color: "#8b857a" }}
           >
             Cases
           </div>
@@ -170,8 +170,8 @@ function App() {
 
         {/* TICKER — full width */}
         <div
-          className="card col-span-4 border-2 border-[#2b2b2b] p-0 overflow-hidden flex items-center"
-          style={{ backgroundColor: "#ece7db", minHeight: "56px", height: "56px" }}
+          className="card col-span-4 border-2 border-[#3d3830] p-0 overflow-hidden flex items-center"
+          style={{ backgroundColor: "#1b1917", minHeight: "56px", height: "56px" }}
         >
           <div className="ticker-track">
             {[...Array(2)].map((_, j) =>
@@ -189,8 +189,8 @@ function App() {
         </div>
 
         {/* ABOUT */}
-        <div className="card col-span-2 row-span-1 border-2 border-[#2b2b2b] p-6 flex items-center gap-7" style={{ backgroundColor: "#ece7db" }}>
-          <div className="w-[100px] h-[100px] rounded-full border-2 border-[#2b2b2b] bg-[#b8a88a] flex items-center justify-center text-[2.4rem] shrink-0">
+        <div className="card col-span-2 row-span-1 border-2 border-[#3d3830] p-6 flex items-center gap-7" style={{ backgroundColor: "#1b1917" }}>
+          <div className="w-[100px] h-[100px] rounded-full border-2 border-[#3d3830] bg-[#8a7a5e] flex items-center justify-center text-[2.4rem] text-[#16150f] shrink-0">
             &#9786;
           </div>
           <div>
@@ -204,10 +204,10 @@ function App() {
         </div>
 
         {/* PROCESS — span 2 cols */}
-        <div className="card col-span-2 row-span-1 border-2 border-[#2b2b2b] p-6" style={{ backgroundColor: "#ece7db" }}>
+        <div className="card col-span-2 row-span-1 border-2 border-[#3d3830] p-6" style={{ backgroundColor: "#1b1917" }}>
           <div
             className="text-[0.65rem] uppercase mb-4"
-            style={{ letterSpacing: "2px", color: "#777" }}
+            style={{ letterSpacing: "2px", color: "#8b857a" }}
           >
             Process
           </div>
@@ -217,7 +217,7 @@ function App() {
               { num: "02", title: "Strategize", desc: "Build a tailored legal strategy for the best outcome." },
               { num: "03", title: "Resolve", desc: "Represent and advocate until the matter is settled." },
             ].map((step) => (
-              <div key={step.num} className="flex-1 border border-[#2b2b2b] p-4 flex flex-col gap-2">
+              <div key={step.num} className="flex-1 border border-[#3d3830] p-4 flex flex-col gap-2">
                 <div
                   className="text-[0.65rem] opacity-40"
                   style={{ letterSpacing: "2px" }}
@@ -236,7 +236,7 @@ function App() {
         </div>
 
         {/* DARK ICON GRID — Law Icons */}
-        <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] grid grid-cols-3 grid-rows-2 bg-[#1a1a1a] p-0 overflow-hidden">
+        <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] grid grid-cols-3 grid-rows-2 bg-[#ece7db] p-0 overflow-hidden">
           {[
             <svg viewBox="0 0 24 24" key="d1"><path d="M12 2v16M6 6h12M4 18h16" /><path d="M6 6L4 18M18 6l2 12" /></svg>,
             <svg viewBox="0 0 24 24" key="d2"><rect x="6" y="3" width="12" height="18" rx="1" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="9" y1="12" x2="15" y2="12" /></svg>,
@@ -245,29 +245,29 @@ function App() {
             <svg viewBox="0 0 24 24" key="d5"><path d="M4 4h16v16H4zM4 12h16M12 4v16"/></svg>,
             <svg viewBox="0 0 24 24" key="d6"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="3"/></svg>,
           ].map((icon, i) => (
-            <div key={i} className="icon-cell-dark flex items-center justify-center border border-[rgba(245,240,232,0.08)] p-4">
+            <div key={i} className="icon-cell-dark flex items-center justify-center border border-[rgba(22,21,15,0.12)] p-4">
               {icon}
             </div>
           ))}
         </div>
 
         {/* CONTROLS */}
-        <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] bg-[#2b2b2b] text-[#f5f0e8] flex items-center justify-center gap-4">
-          <div className="w-[52px] h-[52px] rounded-full border-[1.5px] border-[rgba(245,240,232,0.3)] flex items-center justify-center text-[1.2rem] text-[#f5f0e8] cursor-pointer hover:border-[#f5f0e8] transition-colors">
+        <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] bg-[#ece7db] text-[#16150f] flex items-center justify-center gap-4">
+          <div className="w-[52px] h-[52px] rounded-full border-[1.5px] border-[rgba(22,21,15,0.3)] flex items-center justify-center text-[1.2rem] text-[#16150f] cursor-pointer hover:border-[#16150f] transition-colors">
             &#9664;
           </div>
-          <div className="w-[60px] h-[60px] rounded-full border-[1.5px] border-[rgba(245,240,232,0.3)] bg-[rgba(245,240,232,0.1)] flex items-center justify-center text-[1.4rem] text-[#f5f0e8] cursor-pointer hover:border-[#f5f0e8] transition-colors">
+          <div className="w-[60px] h-[60px] rounded-full border-[1.5px] border-[rgba(22,21,15,0.3)] bg-[rgba(22,21,15,0.08)] flex items-center justify-center text-[1.4rem] text-[#16150f] cursor-pointer hover:border-[#16150f] transition-colors">
             &#9654;
           </div>
-          <div className="w-[52px] h-[52px] rounded-full border-[1.5px] border-[rgba(245,240,232,0.3)] flex items-center justify-center text-[0.8rem] text-[#f5f0e8] cursor-pointer hover:border-[#f5f0e8] transition-colors">
+          <div className="w-[52px] h-[52px] rounded-full border-[1.5px] border-[rgba(22,21,15,0.3)] flex items-center justify-center text-[0.8rem] text-[#16150f] cursor-pointer hover:border-[#16150f] transition-colors">
             &#9654;&#9654;
           </div>
         </div>
 
         {/* TEXTURE / WOOD CARD */}
         <div
-          className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] flex items-center justify-center relative overflow-hidden"
-          style={{ background: "linear-gradient(135deg, #c4a35a 0%, #8b6914 100%)" }}
+          className="card col-span-1 row-span-1 border-2 border-[#3d3830] flex items-center justify-center relative overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #9c7d3f 0%, #5c450d 100%)" }}
         >
           <div className="wood-lines absolute inset-0 opacity-15" />
           <svg viewBox="0 0 80 80" className="w-20 h-20 relative z-10" fill="#f5f0e8">
@@ -276,7 +276,7 @@ function App() {
         </div>
 
         {/* GREEN CARD */}
-        <div className="card col-span-1 row-span-1 border-2 border-[#2b2b2b] p-6 bg-[#3a6b35] text-[#f5f0e8] flex flex-col justify-between">
+        <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] p-6 bg-[#2b5227] text-[#f5f0e8] flex flex-col justify-between">
           <div
             className="text-[0.7rem] uppercase opacity-60"
             style={{ letterSpacing: "2px" }}
@@ -298,8 +298,8 @@ function App() {
 
       {/* ── FOOTER ── */}
       <footer
-        className="flex justify-between items-center border-2 border-[#2b2b2b] px-5 py-4 mt-6 max-w-[1200px] mx-auto"
-        style={{ backgroundColor: "#ece7db" }}
+        className="flex justify-between items-center border-2 border-[#3d3830] px-5 py-4 mt-6 max-w-[1200px] mx-auto"
+        style={{ backgroundColor: "#1b1917" }}
       >
         <span
           className="text-[0.72rem] opacity-50"

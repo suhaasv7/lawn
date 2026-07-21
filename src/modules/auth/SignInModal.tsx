@@ -11,15 +11,15 @@ export function SignInModal() {
       className="fixed inset-0 z-50 flex items-center justify-center"
       onClick={closeSignIn}
     >
-      <div className="absolute inset-0 bg-[#1a1a1a]/60" />
+      <div className="absolute inset-0 bg-[#000000]/70" />
       <div
-        className="relative border-2 border-[#2b2b2b] p-10 max-w-[380px] w-full mx-4"
-        style={{ backgroundColor: "#ece7db" }}
+        className="relative border-2 border-[#3d3830] p-10 max-w-[380px] w-full mx-4 text-[#ece7db]"
+        style={{ backgroundColor: "#1b1917" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={closeSignIn}
-          className="absolute top-4 right-4 text-[#1a1a1a] opacity-50 hover:opacity-100 text-[1.2rem] cursor-pointer bg-transparent border-none"
+          className="absolute top-4 right-4 text-[#ece7db] opacity-50 hover:opacity-100 text-[1.2rem] cursor-pointer bg-transparent border-none"
         >
           ✕
         </button>

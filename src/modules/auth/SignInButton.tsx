@@ -26,7 +26,7 @@ export function SignInButton() {
           <img
             src={user.picture}
             alt={user.name}
-            className="w-7 h-7 rounded-full border border-[#2b2b2b]"
+            className="w-7 h-7 rounded-full border border-[#3d3830]"
             referrerPolicy="no-referrer"
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
@@ -39,15 +39,15 @@ export function SignInButton() {
         </button>
         {dropdownOpen && (
           <div
-            className="absolute right-0 top-full mt-2 border-2 border-[#2b2b2b] min-w-[160px] z-50"
-            style={{ backgroundColor: "#ece7db" }}
+            className="absolute right-0 top-full mt-2 border-2 border-[#3d3830] min-w-[160px] z-50 text-[#ece7db]"
+            style={{ backgroundColor: "#1b1917" }}
           >
             <button
               onClick={() => {
                 logout();
                 setDropdownOpen(false);
               }}
-              className="w-full text-left px-4 py-3 uppercase text-[0.75rem] hover:bg-[#1a1a1a] hover:text-[#f5f0e8] transition-colors cursor-pointer bg-transparent border-none"
+              className="w-full text-left px-4 py-3 uppercase text-[0.75rem] hover:bg-[#ece7db] hover:text-[#16150f] transition-colors cursor-pointer bg-transparent border-none"
               style={{ letterSpacing: "1px" }}
             >
               Sign Out
@@ -61,7 +61,7 @@ export function SignInButton() {
   return (
     <button
       onClick={openSignIn}
-      className="border-[1.5px] border-[#2b2b2b] px-5 py-1.5 uppercase text-[0.8rem] bg-[#1a1a1a] text-[#f5f0e8] hover:bg-[#f5f0e8] hover:text-[#1a1a1a] transition-colors cursor-pointer"
+      className="border-[1.5px] border-[#ece7db] px-5 py-1.5 uppercase text-[0.8rem] bg-[#ece7db] text-[#16150f] hover:bg-transparent hover:text-[#ece7db] transition-colors cursor-pointer"
       style={{ letterSpacing: "1px" }}
     >
       Sign In
