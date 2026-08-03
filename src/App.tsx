@@ -90,6 +90,20 @@ function App() {
           </span>
         </div>
 
+        {/* FITS — external link */}
+        <a
+          href="https://fits.sv7.space/"
+          target="_blank"
+          rel="noreferrer"
+          className="card col-span-1 row-span-1 border-2 border-[#3d3830] p-6 flex flex-col justify-between no-underline bg-[#8f2e22] text-[#f5f0e8] hover:opacity-90 transition-opacity"
+        >
+          <div className="text-[0.65rem] uppercase" style={{ letterSpacing: "2px", color: "rgba(245,240,232,0.6)" }}>
+            External
+          </div>
+          <div className="text-[2rem] font-bold" style={{ letterSpacing: "-1px" }}>fits ↗</div>
+          <div className="text-[0.72rem] opacity-70">fits.sv7.space</div>
+        </a>
+
         {/* SERVICES */}
         <div className="card col-span-1 row-span-1 border-2 border-[#3d3830] p-6 bg-[#243070] text-[#f5f0e8]">
           <div
