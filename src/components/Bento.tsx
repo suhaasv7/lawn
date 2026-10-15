@@ -144,10 +144,11 @@ const Label = ({ children, dot }: { children: React.ReactNode; dot: boolean }) =
 );
 
 // Website preview. Browsers don't let a page read or set the scroll position
-// inside another site's iframe, so the site is loaded as one tall page
-// (PAGE_H) and the tile scrolls over it — that scroll is ours to save. In
-// desktop view the page is laid out at DESKTOP_W and scaled down to the tile.
-// Trade-off: layouts that fill the whole screen stretch to PAGE_H.
+// inside another site's iframe, so while look-only the site is loaded as one
+// tall page (PAGE_H) and the tile scrolls over it — that scroll is ours to
+// save. While interacting, the iframe gets a real window the size of the tile
+// so the site lays out and scrolls normally (that scroll isn't saved). In
+// desktop view the site is laid out at DESKTOP_W and scaled down to the tile.
 const DESKTOP_W = 1280;
 const PAGE_H = 3200;
 
@@ -179,27 +180,36 @@ function WebsiteTile({
 
   // Measure the preview box: it decides the iframe's width (mobile) or scale (desktop).
   const boxRef = useRef<HTMLDivElement>(null);
-  const [boxW, setBoxW] = useState(0);
+  const [box, setBox] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setBoxW(Math.round(entry.contentRect.width)));
+    const ro = new ResizeObserver(([entry]) =>
+      setBox({ w: Math.round(entry.contentRect.width), h: Math.round(entry.contentRect.height) })
+    );
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const boxW = box.w;
   const viewW = desktop ? DESKTOP_W : boxW;
   const scale = viewW ? boxW / viewW : 1;
+  // The site's window height: one tall page to scroll over, or exactly the tile.
+  const viewH = interactive ? box.h / scale : PAGE_H;
 
-  // Restore the saved position (also after a resize or view change rescales it).
+  // Restore the saved position (also after a resize, a view change, or when
+  // interaction is switched off again).
   const saved = tile.scroll ?? 0;
   useEffect(() => {
     const el = boxRef.current;
-    if (el && boxW && Math.abs(el.scrollTop - saved * scale) > 2) el.scrollTop = saved * scale;
-  }, [saved, scale, boxW]);
+    if (el && boxW && !interactive && Math.abs(el.scrollTop - saved * scale) > 2) el.scrollTop = saved * scale;
+  }, [saved, scale, boxW, interactive]);
 
   const scrollTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const onScroll = () => {
     clearTimeout(scrollTimer.current);
+    // Switching to the tile-sized window snaps this box to the top; that
+    // isn't a scroll to save.
+    if (interactive) return;
     scrollTimer.current = setTimeout(() => {
       const el = boxRef.current;
       if (!el || !scale) return;
@@ -265,7 +275,7 @@ function WebsiteTile({
     <div
       ref={boxRef}
       onScroll={onScroll}
-      className={`overflow-x-hidden bg-raised [scrollbar-width:thin] ${embed ? "overflow-y-auto" : "overflow-hidden"} ${
+      className={`overflow-x-hidden bg-raised [scrollbar-width:thin] ${embed && !interactive ? "overflow-y-auto" : "overflow-hidden"} ${
         framed
           ? `relative min-h-0 min-w-0 flex-1 rounded-theme-sm border transition-colors ${interactive ? "border-accent ring-1 ring-accent" : "border-line"}`
           : `absolute inset-0 ${interactive ? "ring-2 ring-inset ring-accent" : ""}`
@@ -273,18 +283,17 @@ function WebsiteTile({
     >
       {embed ? (
         // Sizer gives the box the scaled page's height to scroll through.
-        <div className="relative" style={{ height: PAGE_H * scale }}>
+        <div className="relative" style={{ height: viewH * scale }}>
           {boxW > 0 && (
             <iframe
               key={tile.view ?? "desktop"}
               src={tile.url}
               title={`${tile.title} (${site})`}
               loading="lazy"
-              scrolling="no"
               referrerPolicy="no-referrer"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               tabIndex={interactive ? 0 : -1}
-              style={{ width: viewW, height: PAGE_H, transform: `scale(${scale})`, transformOrigin: "0 0" }}
+              style={{ width: viewW, height: viewH, transform: `scale(${scale})`, transformOrigin: "0 0" }}
               className={`absolute top-0 left-0 border-0 ${interactive ? "" : "pointer-events-none"}`}
             />
           )}
@@ -310,7 +319,7 @@ function WebsiteTile({
         {/* A thin strip along the top edge; hovering it (or tabbing into it)
             slides the controls bar in. Hidden bar = no pointer events, so the
             site underneath stays usable. */}
-        <div className="group/top absolute inset-x-0 top-0 z-[1] h-3">
+        <div className="group/top absolute inset-x-0 top-0 z-[1] h-2">
           <div
             className={`invisible absolute inset-x-0 top-0 flex items-center gap-2 border-b border-line bg-bg/85 py-2 text-[11px] text-faint opacity-0 backdrop-blur-md transition-[opacity,visibility] duration-200 group-focus-within/top:visible group-focus-within/top:opacity-100 group-hover/top:visible group-hover/top:opacity-100 ${isEditing ? "px-9" : "px-3"}`}
           >
@@ -1242,11 +1251,15 @@ function Bento({
         </dialog>
       )}
 
-      {/* ── ARCHIVE: cards hidden from the grid; restore puts them back where they were ── */}
+      {/* ── ARCHIVE: a near-fullscreen view of the archived cards, shown as the
+          cards themselves; restore puts one back where it was in the grid. ── */}
       {editable && (
-        <dialog ref={archiveDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(480px,calc(100vw-32px))] p-0`}>
-          <div className="flex flex-col gap-4 p-5">
-            <div className="flex items-center justify-between">
+        <dialog
+          ref={archiveDialogRef}
+          className={`add-dialog ${PANEL} m-auto h-[calc(100dvh-48px)] max-h-none w-[calc(100vw-48px)] max-w-none p-0`}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
               <h2 className="m-0 text-base font-semibold">
                 Archive <span className="font-normal text-faint">({archived.length})</span>
               </h2>
@@ -1254,44 +1267,52 @@ function Bento({
                 type="button"
                 onClick={() => archiveDialogRef.current?.close()}
                 aria-label="Close"
-                className="grid size-7 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
+                className="grid size-8 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
+                <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} />
               </button>
             </div>
-            {archived.length === 0 ? (
-              <p className="m-0 text-sm text-muted">
-                Nothing archived. In Edit mode, use a card&apos;s archive button (top-left) to move it here.
-              </p>
-            ) : (
-              <ul className="m-0 flex max-h-[60dvh] list-none flex-col gap-2 overflow-y-auto p-0">
-                {archived.map((t) => (
-                  <li key={t.id} className="flex items-center gap-3 rounded-theme border border-line px-3 py-2">
-                    {t.kind === "bookmark" || t.kind === "website" ? (
-                      <img src={favicon(t.url)} alt="" width={16} height={16} className="shrink-0" />
-                    ) : (
-                      <span
-                        className="size-2 shrink-0 rounded-theme bg-(--tone)"
-                        style={{ "--tone": t.tone === "plain" ? "var(--t-faint)" : TONE[t.tone] } as React.CSSProperties}
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-fg">{labelOf(t)}</div>
-                      <div className="text-[11px] text-faint">
-                        {KIND_LABEL[t.kind]} · {t.w}×{t.h}
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 [scrollbar-width:thin]">
+              {archived.length === 0 ? (
+                <p className="m-0 grid h-full place-items-center text-sm text-muted">
+                  Nothing archived. In Edit mode, use a card&apos;s archive button (top-left) to move it here.
+                </p>
+              ) : (
+                <div className="bento-wrap w-full">
+                  <div className="bento-grid">
+                    {archived.map((t) => (
+                      <div key={t.id} className="relative" style={{ "--w": t.w, "--h": t.h } as React.CSSProperties}>
+                        <TileCard
+                          tile={t}
+                          isEditing={false}
+                          onChange={(patch) =>
+                            setTiles((prev) => prev.map((x) => (x.id === t.id ? ({ ...x, ...patch } as Tile) : x)))
+                          }
+                        />
+                        <div className="absolute top-1.5 right-1.5 z-[2] flex gap-1">
+                          <button
+                            onClick={() => setArchived(t, false)}
+                            aria-label={`Restore ${labelOf(t)}`}
+                            title="Restore to the grid"
+                            className="flex size-6 cursor-pointer items-center justify-center rounded-theme border border-line-strong bg-bg/80 text-fg backdrop-blur transition-colors hover:bg-fg hover:text-bg"
+                          >
+                            <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={11} strokeWidth={2} />
+                          </button>
+                          <button
+                            onClick={() => removeTile(t)}
+                            aria-label={`Delete ${labelOf(t)}`}
+                            title="Delete for good"
+                            className="flex size-6 cursor-pointer items-center justify-center rounded-theme border border-line-strong bg-bg/80 text-fg backdrop-blur transition-colors hover:bg-fg hover:text-bg"
+                          >
+                            <HugeiconsIcon icon={Delete02Icon} size={11} strokeWidth={2} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <button onClick={() => setArchived(t, false)} className={BTN}>
-                      <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={13} strokeWidth={1.75} />
-                      Restore
-                    </button>
-                    <button onClick={() => removeTile(t)} aria-label={`Delete ${labelOf(t)}`} title="Delete for good" className={BTN}>
-                      <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={1.75} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </dialog>
       )}
