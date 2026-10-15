@@ -3,7 +3,7 @@
 // reachable and what "Reset" restores.
 // w/h are in grid cells: a cell is a fixed 56px square with a 12px gap.
 
-export const KINDS = ["intro", "bookmark", "website", "note", "list", "clock"] as const;
+export const KINDS = ["intro", "bookmark", "website", "note", "todo", "list", "clock"] as const;
 export type Kind = (typeof KINDS)[number];
 
 // "accent" follows the active theme; "plain" has no tint.
@@ -18,24 +18,40 @@ export const MIN_SIZE: Record<Kind, [number, number]> = {
   intro: [6, 5],
   bookmark: [1, 1],
   website: [3, 3],
-  note: [3, 2],
+  note: [2, 2],
+  todo: [3, 3],
   list: [3, 2],
   clock: [3, 2],
 };
 
 // Size a newly added tile starts at.
-export const ADD_SIZE = { bookmark: [1, 1], website: [4, 4] } as const;
+export const ADD_SIZE = { bookmark: [1, 1], website: [4, 4], note: [4, 3], todo: [4, 4] } as const;
 
-type Base = { id: string; tone: Tone; w: number; h: number };
+// archived: hidden from the grid, listed in the archive view.
+type Base = { id: string; tone: Tone; w: number; h: number; archived?: boolean };
 // embed: whether the site allows being shown in an iframe (checked when added;
 // false falls back to a screenshot). image: optional custom preview.
-type Link = { url: string; title: string; note?: string; image?: string; embed?: boolean };
+// view: website preview at desktop width (default) or the site's mobile layout.
+// scroll: where the preview was last scrolled to, in the site's own pixels.
+// frame: website shown with border, header and title (default: full-bleed,
+// controls appear when you hover the top edge).
+type Link = {
+  url: string;
+  title: string;
+  note?: string;
+  image?: string;
+  embed?: boolean;
+  view?: "desktop" | "mobile";
+  scroll?: number;
+  frame?: boolean;
+};
 
 export type Tile =
   | (Base & { kind: "intro"; name: string; blurb: string })
   | (Base & { kind: "bookmark" } & Link)
   | (Base & { kind: "website" } & Link)
-  | (Base & { kind: "note"; label: string; text: string })
+  | (Base & { kind: "note"; label: string; text: string }) // free text you type in edit mode
+  | (Base & { kind: "todo"; label: string; items: { text: string; done: boolean }[] })
   | (Base & { kind: "list"; label: string; items: string[] })
   | (Base & { kind: "clock"; label: string; timeZone: string });
 

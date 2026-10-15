@@ -5,7 +5,7 @@ import { dbConfigured, select } from "./db";
 
 export type SiteData = { tiles: Tile[]; themes: Theme[]; settings: Settings; live: boolean };
 
-type TileRow = Pick<Tile, "id" | "kind" | "w" | "h" | "tone"> & { props: Record<string, unknown> };
+type TileRow = Pick<Tile, "id" | "kind" | "w" | "h" | "tone" | "archived"> & { props: Record<string, unknown> };
 
 const FALLBACK: SiteData = { tiles: TILES, themes: [DEFAULT_THEME], settings: DEFAULT_SETTINGS, live: false };
 
@@ -16,7 +16,7 @@ export const getSiteData = cache(async (): Promise<SiteData> => {
   if (!dbConfigured) return FALLBACK;
   try {
     const [rows, themes, settings] = await Promise.all([
-      select<TileRow>("tiles", "select=id,kind,w,h,tone,props&order=position"),
+      select<TileRow>("tiles", "select=id,kind,w,h,tone,archived,props&order=position"),
       select<Theme>(
         "themes",
         "select=id,name,is_preset,bg,surface,raised,line,line_strong,fg,muted,faint,accent,glow_1,glow_2&order=is_preset.desc,created_at,name"

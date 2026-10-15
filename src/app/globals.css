@@ -128,6 +128,17 @@ body::before {
   }
 }
 
+/* Full-bleed website tile: no border, wash or spotlight — the site fills it.
+   Plain CSS so it wins over the tile utility. */
+.tile-bare {
+  border-width: 0;
+  background: var(--t-raised);
+}
+
+.tile-bare::after {
+  display: none;
+}
+
 @utility glow-text {
   background: linear-gradient(180deg, var(--t-fg) 30%, color-mix(in oklab, var(--t-fg) 45%, transparent));
   -webkit-background-clip: text;
@@ -136,8 +147,8 @@ body::before {
 }
 
 /* ── Bento grid: fixed 56px square cells, 12px gaps ──
-   Tiles span w x h cells. Columns are as many as fit the container (4 on a
-   small phone, 18 at full width); wider tiles clamp to that. dense flow
+   Tiles span w x h cells. Columns are as many as fit the full-width
+   container (4 on a small phone, up to 40); wider tiles clamp to that. dense flow
    backfills holes left by big tiles. */
 .bento-wrap {
   container-type: inline-size;
@@ -155,7 +166,7 @@ body::before {
   justify-content: center;
 }
 
-/* n columns need n*56 + (n-1)*12 = 68n - 12 px */
+/* n columns need n*56 + (n-1)*12 = 68n - 12 px (up to 40 columns ≈ 2708px) */
 @container (min-width: 328px) { .bento-grid { --cols: 5; } }
 @container (min-width: 396px) { .bento-grid { --cols: 6; } }
 @container (min-width: 464px) { .bento-grid { --cols: 7; } }
@@ -170,6 +181,28 @@ body::before {
 @container (min-width: 1076px) { .bento-grid { --cols: 16; } }
 @container (min-width: 1144px) { .bento-grid { --cols: 17; } }
 @container (min-width: 1212px) { .bento-grid { --cols: 18; } }
+@container (min-width: 1280px) { .bento-grid { --cols: 19; } }
+@container (min-width: 1348px) { .bento-grid { --cols: 20; } }
+@container (min-width: 1416px) { .bento-grid { --cols: 21; } }
+@container (min-width: 1484px) { .bento-grid { --cols: 22; } }
+@container (min-width: 1552px) { .bento-grid { --cols: 23; } }
+@container (min-width: 1620px) { .bento-grid { --cols: 24; } }
+@container (min-width: 1688px) { .bento-grid { --cols: 25; } }
+@container (min-width: 1756px) { .bento-grid { --cols: 26; } }
+@container (min-width: 1824px) { .bento-grid { --cols: 27; } }
+@container (min-width: 1892px) { .bento-grid { --cols: 28; } }
+@container (min-width: 1960px) { .bento-grid { --cols: 29; } }
+@container (min-width: 2028px) { .bento-grid { --cols: 30; } }
+@container (min-width: 2096px) { .bento-grid { --cols: 31; } }
+@container (min-width: 2164px) { .bento-grid { --cols: 32; } }
+@container (min-width: 2232px) { .bento-grid { --cols: 33; } }
+@container (min-width: 2300px) { .bento-grid { --cols: 34; } }
+@container (min-width: 2368px) { .bento-grid { --cols: 35; } }
+@container (min-width: 2436px) { .bento-grid { --cols: 36; } }
+@container (min-width: 2504px) { .bento-grid { --cols: 37; } }
+@container (min-width: 2572px) { .bento-grid { --cols: 38; } }
+@container (min-width: 2640px) { .bento-grid { --cols: 39; } }
+@container (min-width: 2708px) { .bento-grid { --cols: 40; } }
 
 .bento-grid > [data-swapy-slot] {
   grid-column: span min(var(--w, 1), var(--cols));

@@ -9,6 +9,14 @@ import {
   ArrowUpRight01Icon,
   ArrowExpandDiagonal01Icon,
   Cursor01Icon,
+  ComputerIcon,
+  SmartPhone01Icon,
+  BorderFullIcon,
+  BorderNone01Icon,
+  ArchiveIcon,
+  ArchiveArrowDownIcon,
+  ArrowTurnBackwardIcon,
+  Delete02Icon,
   Cancel01Icon,
   Tick01Icon,
   Drag01Icon,
@@ -66,12 +74,22 @@ const PANEL =
 
 const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 const favicon = (url: string) => `https://www.google.com/s2/favicons?domain=${host(url)}&sz=128`;
+const KIND_LABEL: Record<Tile["kind"], string> = {
+  intro: "Intro",
+  bookmark: "Bookmark",
+  website: "Website",
+  note: "Note",
+  todo: "To-do",
+  list: "List",
+  clock: "Clock",
+};
 const labelOf = (t: Tile) =>
-  t.kind === "bookmark" || t.kind === "website" ? t.title : t.kind === "intro" ? t.name : t.label;
+  (t.kind === "bookmark" || t.kind === "website" ? t.title : t.kind === "intro" ? t.name : t.label) ||
+  KIND_LABEL[t.kind];
 
 // ponytail: microlink's free tier (~50 previews/day per visitor IP); set `image`
 // on the tile or self-host screenshots if that ever runs dry.
-const preview = (url: string) =>
+const previewImage = (url: string) =>
   `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&meta=false&embed=screenshot.url`;
 
 const ARROWS: Record<string, [number, number]> = {
@@ -125,42 +143,109 @@ const Label = ({ children, dot }: { children: React.ReactNode; dot: boolean }) =
   </div>
 );
 
-// Website: the live site in an iframe (or a screenshot if it refuses to be
-// framed). Look-only by default; the cursor button turns interaction on.
-// Always look-only while editing so dragging works.
+// Website preview. Browsers don't let a page read or set the scroll position
+// inside another site's iframe, so the site is loaded as one tall page
+// (PAGE_H) and the tile scrolls over it — that scroll is ours to save. In
+// desktop view the page is laid out at DESKTOP_W and scaled down to the tile.
+// Trade-off: layouts that fill the whole screen stretch to PAGE_H.
+const DESKTOP_W = 1280;
+const PAGE_H = 3200;
+
+// Full-bleed by default: the site covers the whole tile and the controls slide
+// in when you hover the top edge. The frame button switches to the bordered
+// layout with header and title. Look-only until the cursor button turns
+// interaction on (always look-only while editing, so dragging works).
+// Screenshot if the site can't be framed.
 function WebsiteTile({
   tile,
   isEditing,
   style,
+  onChange,
 }: {
   tile: Extract<Tile, { kind: "website" }>;
   isEditing: boolean;
   style: React.CSSProperties;
+  onChange: (patch: Partial<Tile>) => void;
 }) {
   const [live, setLive] = useState(false);
   const interactive = live && !isEditing;
   const site = host(tile.url);
   const embed = tile.embed !== false && !tile.image;
+  const desktop = tile.view !== "mobile";
+  const framed = tile.frame === true;
   const iconBtn =
-    "grid size-7 shrink-0 cursor-pointer place-items-center rounded-theme border border-line text-muted transition-colors hover:border-line-strong hover:text-fg";
+    "grid size-7 shrink-0 cursor-pointer place-items-center rounded-theme border border-line bg-bg/40 text-muted transition-colors hover:border-line-strong hover:text-fg";
   const guard = (e: React.MouseEvent) => isEditing && e.preventDefault();
 
-  return (
-    <div className="tile group flex h-full w-full flex-col gap-3 p-4" style={style}>
-      <div className="flex items-center gap-2 text-[11px] text-faint">
-        <img src={favicon(tile.url)} alt="" width={14} height={14} draggable={false} className="shrink-0" />
-        <span className="min-w-0 truncate">{site}</span>
+  // Measure the preview box: it decides the iframe's width (mobile) or scale (desktop).
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxW, setBoxW] = useState(0);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setBoxW(Math.round(entry.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const viewW = desktop ? DESKTOP_W : boxW;
+  const scale = viewW ? boxW / viewW : 1;
+
+  // Restore the saved position (also after a resize or view change rescales it).
+  const saved = tile.scroll ?? 0;
+  useEffect(() => {
+    const el = boxRef.current;
+    if (el && boxW && Math.abs(el.scrollTop - saved * scale) > 2) el.scrollTop = saved * scale;
+  }, [saved, scale, boxW]);
+
+  const scrollTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const onScroll = () => {
+    clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      const el = boxRef.current;
+      if (!el || !scale) return;
+      const y = Math.round(el.scrollTop / scale);
+      if (y !== saved) onChange({ scroll: y });
+    }, 400);
+  };
+
+  const header = (
+    <>
+      <img src={favicon(tile.url)} alt="" width={14} height={14} draggable={false} className="shrink-0" />
+      <span className="min-w-0 truncate">{site}</span>
+      <span className="ml-auto flex shrink-0 gap-1.5">
+        {embed && (
+          <button
+            type="button"
+            data-swapy-no-drag
+            onClick={() => onChange({ view: desktop ? "mobile" : "desktop", scroll: 0 })}
+            title={desktop ? "Desktop view — switch to mobile" : "Mobile view — switch to desktop"}
+            aria-label={desktop ? "Switch to mobile view" : "Switch to desktop view"}
+            className={iconBtn}
+          >
+            <HugeiconsIcon icon={desktop ? ComputerIcon : SmartPhone01Icon} size={13} strokeWidth={1.75} />
+          </button>
+        )}
         {embed && !isEditing && (
           <button
             type="button"
             onClick={() => setLive((v) => !v)}
             aria-pressed={live}
             title={live ? "Stop interacting" : "Interact with the site"}
-            className={`${iconBtn} ml-auto aria-pressed:border-accent aria-pressed:bg-accent/15 aria-pressed:text-fg`}
+            className={`${iconBtn} aria-pressed:border-accent aria-pressed:bg-accent/15 aria-pressed:text-fg`}
           >
             <HugeiconsIcon icon={live ? Cancel01Icon : Cursor01Icon} size={13} strokeWidth={1.75} />
           </button>
         )}
+        <button
+          type="button"
+          data-swapy-no-drag
+          onClick={() => onChange({ frame: !framed })}
+          title={framed ? "Hide frame (full-bleed)" : "Show frame and controls"}
+          aria-label={framed ? "Hide frame" : "Show frame"}
+          className={iconBtn}
+        >
+          <HugeiconsIcon icon={framed ? BorderNone01Icon : BorderFullIcon} size={13} strokeWidth={1.75} />
+        </button>
         <a
           href={tile.url}
           target="_blank"
@@ -168,36 +253,78 @@ function WebsiteTile({
           draggable={false}
           onClick={guard}
           aria-label={`Open ${site} in a new tab`}
-          className={`${iconBtn} ${embed && !isEditing ? "" : "ml-auto"}`}
+          className={iconBtn}
         >
           <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} strokeWidth={1.75} />
         </a>
+      </span>
+    </>
+  );
+
+  const preview = (
+    <div
+      ref={boxRef}
+      onScroll={onScroll}
+      className={`overflow-x-hidden bg-raised [scrollbar-width:thin] ${embed ? "overflow-y-auto" : "overflow-hidden"} ${
+        framed
+          ? `relative min-h-0 min-w-0 flex-1 rounded-theme-sm border transition-colors ${interactive ? "border-accent ring-1 ring-accent" : "border-line"}`
+          : `absolute inset-0 ${interactive ? "ring-2 ring-inset ring-accent" : ""}`
+      }`}
+    >
+      {embed ? (
+        // Sizer gives the box the scaled page's height to scroll through.
+        <div className="relative" style={{ height: PAGE_H * scale }}>
+          {boxW > 0 && (
+            <iframe
+              key={tile.view ?? "desktop"}
+              src={tile.url}
+              title={`${tile.title} (${site})`}
+              loading="lazy"
+              scrolling="no"
+              referrerPolicy="no-referrer"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              tabIndex={interactive ? 0 : -1}
+              style={{ width: viewW, height: PAGE_H, transform: `scale(${scale})`, transformOrigin: "0 0" }}
+              className={`absolute top-0 left-0 border-0 ${interactive ? "" : "pointer-events-none"}`}
+            />
+          )}
+        </div>
+      ) : (
+        // absolute img: a 2560px screenshot must not stretch the grid row
+        <img
+          src={tile.image ?? previewImage(tile.url)}
+          alt={`Preview of ${site}`}
+          loading="lazy"
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition duration-500 group-hover:scale-[1.03] group-hover:opacity-100"
+          onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+        />
+      )}
+    </div>
+  );
+
+  if (!framed) {
+    return (
+      <div className="tile tile-bare group h-full w-full" style={style}>
+        {preview}
+        {/* A thin strip along the top edge; hovering it (or tabbing into it)
+            slides the controls bar in. Hidden bar = no pointer events, so the
+            site underneath stays usable. */}
+        <div className="group/top absolute inset-x-0 top-0 z-[1] h-3">
+          <div
+            className={`invisible absolute inset-x-0 top-0 flex items-center gap-2 border-b border-line bg-bg/85 py-2 text-[11px] text-faint opacity-0 backdrop-blur-md transition-[opacity,visibility] duration-200 group-focus-within/top:visible group-focus-within/top:opacity-100 group-hover/top:visible group-hover/top:opacity-100 ${isEditing ? "px-9" : "px-3"}`}
+          >
+            {header}
+          </div>
+        </div>
       </div>
-      <div
-        className={`relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-theme-sm border bg-raised transition-colors ${interactive ? "border-accent ring-1 ring-accent" : "border-line"}`}
-      >
-        {embed ? (
-          <iframe
-            src={tile.url}
-            title={`${tile.title} (${site})`}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            tabIndex={interactive ? 0 : -1}
-            className={`absolute inset-0 h-full w-full border-0 ${interactive ? "" : "pointer-events-none"}`}
-          />
-        ) : (
-          // absolute img: a 2560px screenshot must not stretch the grid row
-          <img
-            src={tile.image ?? preview(tile.url)}
-            alt={`Preview of ${site}`}
-            loading="lazy"
-            draggable={false}
-            className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition duration-500 group-hover:scale-[1.03] group-hover:opacity-100"
-            onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-          />
-        )}
-      </div>
+    );
+  }
+
+  return (
+    <div className="tile group flex h-full w-full flex-col gap-3 p-4" style={style}>
+      <div className="flex items-center gap-2 text-[11px] text-faint">{header}</div>
+      {preview}
       <a href={tile.url} target="_blank" rel="noreferrer" draggable={false} onClick={guard} className="min-w-0 text-fg no-underline">
         <div className="truncate text-base font-semibold leading-tight tracking-tight">{tile.title}</div>
         <div className="truncate text-xs text-muted">{tile.note ?? site}</div>
@@ -206,7 +333,100 @@ function WebsiteTile({
   );
 }
 
-function TileCard({ tile, isEditing }: { tile: Tile; isEditing: boolean }) {
+// To-do list: tick, add and delete items any time; the label is edited in edit mode.
+function TodoTile({
+  tile,
+  isEditing,
+  style,
+  onChange,
+}: {
+  tile: Extract<Tile, { kind: "todo" }>;
+  isEditing: boolean;
+  style: React.CSSProperties;
+  onChange: (patch: Partial<Tile>) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const items = tile.items ?? [];
+  const setItems = (next: typeof items) => onChange({ items: next });
+  const done = items.filter((i) => i.done).length;
+
+  return (
+    <div className="tile flex h-full w-full flex-col gap-3 p-5" style={style}>
+      <div className={`flex items-center gap-2 ${SECTION}`}>
+        {tile.tone !== "plain" && <span className="size-1.5 rounded-theme bg-(--tone) shadow-[0_0_10px_var(--tone)]" />}
+        {isEditing ? (
+          <input
+            data-swapy-no-drag
+            aria-label="List label"
+            value={tile.label}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder="to-do"
+            maxLength={40}
+            className="min-w-0 flex-1 bg-transparent uppercase tracking-[0.14em] outline-none placeholder:text-faint/60"
+          />
+        ) : (
+          <span className="min-w-0 truncate">{tile.label || "to-do"}</span>
+        )}
+        <span className="ml-auto tabular-nums tracking-normal">
+          {done}/{items.length}
+        </span>
+      </div>
+      <ul className="m-0 min-h-0 flex-1 list-none space-y-1.5 overflow-y-auto p-0 [scrollbar-width:thin]">
+        {items.map((item, i) => (
+          <li key={i} className="group/item flex items-start gap-2 text-[13px] leading-snug">
+            <input
+              data-swapy-no-drag
+              type="checkbox"
+              checked={item.done}
+              onChange={() => setItems(items.map((it, j) => (j === i ? { ...it, done: !it.done } : it)))}
+              aria-label={item.text}
+              className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-accent"
+            />
+            <span className={`min-w-0 flex-1 break-words ${item.done ? "text-faint line-through" : ""}`}>{item.text}</span>
+            <button
+              type="button"
+              data-swapy-no-drag
+              onClick={() => setItems(items.filter((_, j) => j !== i))}
+              aria-label={`Delete "${item.text}"`}
+              className="shrink-0 cursor-pointer text-faint opacity-0 transition-opacity group-hover/item:opacity-100 hover:text-fg focus:opacity-100"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        data-swapy-no-drag
+        onSubmit={(e) => {
+          e.preventDefault();
+          const text = draft.trim();
+          if (!text) return;
+          setItems([...items, { text, done: false }]);
+          setDraft("");
+        }}
+      >
+        <input
+          aria-label="Add a to-do"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Add a to-do…"
+          maxLength={200}
+          className="w-full border-t border-line bg-transparent pt-2 text-[13px] text-fg outline-none placeholder:text-faint"
+        />
+      </form>
+    </div>
+  );
+}
+
+function TileCard({
+  tile,
+  isEditing,
+  onChange,
+}: {
+  tile: Tile;
+  isEditing: boolean;
+  onChange: (patch: Partial<Tile>) => void;
+}) {
   const style = { "--tone": TONE[tile.tone] ?? "transparent" } as React.CSSProperties;
   const base = "tile w-full h-full flex";
   const dot = tile.tone !== "plain";
@@ -279,16 +499,51 @@ function TileCard({ tile, isEditing }: { tile: Tile; isEditing: boolean }) {
         );
       }
 
-      return <WebsiteTile tile={tile} isEditing={isEditing} style={style} />;
+      return <WebsiteTile tile={tile} isEditing={isEditing} style={style} onChange={onChange} />;
     }
 
     case "note":
+      // Edit mode turns the note into fields you type into; otherwise it's text.
+      if (isEditing) {
+        return (
+          <div className={`${base} flex-col gap-2 p-4 pt-9`} style={style}>
+            <input
+              data-swapy-no-drag
+              aria-label="Note label"
+              value={tile.label}
+              onChange={(e) => onChange({ label: e.target.value })}
+              placeholder="Label (optional)"
+              maxLength={40}
+              className={`${SECTION} bg-transparent outline-none placeholder:text-faint/60`}
+            />
+            <textarea
+              data-swapy-no-drag
+              aria-label="Note text"
+              value={tile.text}
+              onChange={(e) => onChange({ text: e.target.value })}
+              placeholder="Type anything…"
+              maxLength={3000}
+              autoFocus={!tile.text}
+              className="min-h-0 flex-1 resize-none bg-transparent text-[15px] leading-relaxed text-fg outline-none placeholder:text-faint"
+            />
+          </div>
+        );
+      }
       return (
-        <div className={`${base} flex-col justify-between p-5`} style={style}>
-          <Label dot={dot}>{tile.label}</Label>
-          <p className="text-lg font-medium leading-snug tracking-tight sm:text-xl">{tile.text}</p>
+        <div className={`${base} flex-col gap-3 p-5`} style={style}>
+          {tile.label && <Label dot={dot}>{tile.label}</Label>}
+          <p
+            className={`m-0 mt-auto min-h-0 overflow-y-auto whitespace-pre-wrap break-words [scrollbar-width:thin] ${
+              tile.text.length > 90 ? "text-sm leading-relaxed" : "text-lg font-medium leading-snug tracking-tight sm:text-xl"
+            }`}
+          >
+            {tile.text}
+          </p>
         </div>
       );
+
+    case "todo":
+      return <TodoTile tile={tile} isEditing={isEditing} style={style} onChange={onChange} />;
 
     case "list":
       return (
@@ -342,7 +597,7 @@ function ThemeCenter({
       popover="auto"
       // Closing the panel discards an unsaved draft (and its live preview).
       onToggle={(e) => (e.nativeEvent as ToggleEvent).newState === "closed" && setDraft(null)}
-      className={`${PANEL} fixed inset-auto top-[76px] right-[max(16px,calc((100vw-1240px)/2))] m-0 max-h-[calc(100dvh-96px)] w-[min(360px,calc(100vw-32px))] overflow-auto p-4`}
+      className={`${PANEL} fixed inset-auto top-[76px] right-4 sm:right-6 lg:right-8 m-0 max-h-[calc(100dvh-96px)] w-[min(360px,calc(100vw-32px))] overflow-auto p-4`}
     >
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
@@ -513,11 +768,15 @@ function Bento({
   const [resetFeedback, setResetFeedback] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [entering, setEntering] = useState(true);
+  const [addKind, setAddKind] = useState<"bookmark" | "website" | "note" | "todo">("bookmark");
+  const visible = tiles.filter((t) => !t.archived);
+  const archived = tiles.filter((t) => t.archived);
   const editing = editable && isEditing;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const swapyRef = useRef<Swapy | null>(null);
   const addDialogRef = useRef<HTMLDialogElement>(null);
+  const archiveDialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 1400);
@@ -590,7 +849,10 @@ function Bento({
       flushSync(() =>
         setTiles((prev) => {
           const byId = new Map(prev.map((t) => [t.id, t]));
-          return prev.map((t, i) => byId.get(map[`slot-${i}`]) ?? t);
+          // Slots are the visible tiles only; archived ones keep their place.
+          const shown = prev.filter((t) => !t.archived).map((t, i) => byId.get(map[`slot-${i}`]) ?? t);
+          let k = 0;
+          return prev.map((t) => (t.archived ? t : shown[k++]));
         })
       );
     });
@@ -652,15 +914,36 @@ function Bento({
     el.style.setProperty("--my", `${e.clientY - r.top}px`);
   };
 
+  const setArchived = (tile: Tile, value: boolean) => {
+    setTiles((prev) => prev.map((t) => (t.id === tile.id ? { ...t, archived: value } : t)));
+    setLayoutVersion((v) => v + 1);
+  };
+
   const removeTile = (tile: Tile) => {
-    if (!confirm(`Remove "${labelOf(tile)}"?`)) return;
+    if (!confirm(`Delete "${labelOf(tile)}" for good?`)) return;
     setTiles((prev) => prev.filter((t) => t.id !== tile.id));
     setLayoutVersion((v) => v + 1);
   };
 
-  const addSite = async (e: React.FormEvent<HTMLFormElement>) => {
+  const addTile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
+    const done = () => {
+      setLayoutVersion((v) => v + 1);
+      form.reset();
+      addDialogRef.current?.close();
+    };
+    if (addKind === "note") {
+      const [w, h] = ADD_SIZE.note;
+      setTiles((prev) => [...prev, { id: `note-${Date.now()}`, kind: "note", label: "", text: "", tone: "plain", w, h }]);
+      setIsEditing(true); // straight into typing
+      return done();
+    }
+    if (addKind === "todo") {
+      const [w, h] = ADD_SIZE.todo;
+      setTiles((prev) => [...prev, { id: `todo-${Date.now()}`, kind: "todo", label: "", items: [], tone: "plain", w, h }]);
+      return done();
+    }
     const urlInput = form.elements.namedItem("url") as HTMLInputElement;
     const raw = urlInput.value.trim();
     let href = "";
@@ -677,13 +960,11 @@ function Bento({
       return;
     }
     const title = (form.elements.namedItem("title") as HTMLInputElement).value.trim() || host(href);
-    const kind = (form.elements.namedItem("kind") as RadioNodeList).value === "website" ? "website" : "bookmark";
+    const kind = addKind;
     const [w, h] = ADD_SIZE[kind];
     const embed = kind === "website" ? await canEmbed(href) : undefined;
     setTiles((prev) => [...prev, { id: `link-${Date.now()}`, kind, url: href, title, tone: "plain", w, h, embed }]);
-    setLayoutVersion((v) => v + 1);
-    form.reset();
-    addDialogRef.current?.close();
+    done();
   };
 
   // Defaults back in their default order/size; sites you added stay, at the end.
@@ -732,7 +1013,7 @@ function Bento({
   return (
     <div className="flex min-h-screen flex-col p-4 sm:p-6 lg:p-8">
       {/* ── TOP NAV ── */}
-      <header className="sticky top-3 z-40 mx-auto mb-5 flex w-full max-w-[1240px] items-center justify-between gap-3 rounded-theme border border-line bg-bg/70 px-4 py-2.5 backdrop-blur-xl backdrop-saturate-150">
+      <header className="sticky top-3 z-40 mb-5 flex w-full items-center justify-between gap-3 rounded-theme border border-line bg-bg/70 px-4 py-2.5 backdrop-blur-xl backdrop-saturate-150">
         <a href="#" className="flex h-8 items-center text-[15px] font-semibold tracking-tight text-fg no-underline">
           lawn
           <span
@@ -755,6 +1036,16 @@ function Bento({
                 <span className="hidden sm:inline">{resetFeedback ? "Layout reset" : "Reset"}</span>
               </button>
             )}
+            <button
+              onClick={() => archiveDialogRef.current?.showModal()}
+              aria-label={`Archive (${archived.length})`}
+              title="Archived cards"
+              className={BTN}
+            >
+              <HugeiconsIcon icon={ArchiveIcon} size={14} strokeWidth={1.75} />
+              <span className="hidden sm:inline">Archive</span>
+              {archived.length > 0 && <span className="tabular-nums text-faint">{archived.length}</span>}
+            </button>
             <button popoverTarget="theme-center" aria-label="Theme center" className={BTN}>
               <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={1.75} />
               <span className="hidden sm:inline">Theme</span>
@@ -790,20 +1081,26 @@ function Bento({
       )}
 
       {/* ── BENTO GRID: square cells, tiles span w x h of them ── */}
-      <div className="bento-wrap mx-auto w-full max-w-[1240px]">
+      <div className="bento-wrap w-full">
         <main
           ref={containerRef}
           onPointerMove={trackPointer}
           className={`bento-grid${editing ? " editing" : ""}${entering ? " entering" : ""}`}
         >
-          {tiles.map((tile, i) => (
+          {visible.map((tile, i) => (
             <div
               key={`slot-${i}`}
               data-swapy-slot={`slot-${i}`}
               style={{ "--w": tile.w, "--h": tile.h, "--i": i } as React.CSSProperties}
             >
               <div key={tile.id} data-swapy-item={tile.id} className="relative h-full w-full">
-                <TileCard tile={tile} isEditing={editing} />
+                <TileCard
+                  tile={tile}
+                  isEditing={editing}
+                  onChange={(patch) =>
+                    setTiles((prev) => prev.map((t) => (t.id === tile.id ? ({ ...t, ...patch } as Tile) : t)))
+                  }
+                />
                 {editing && (
                   <>
                     {tile.w > 1 && tile.h > 1 && (
@@ -816,8 +1113,18 @@ function Bento({
                     )}
                     <button
                       data-swapy-no-drag
+                      onClick={() => setArchived(tile, true)}
+                      aria-label={`Archive ${labelOf(tile)}`}
+                      title="Archive"
+                      className={`${CTL_BTN} top-1.5 left-1.5`}
+                    >
+                      <HugeiconsIcon icon={ArchiveArrowDownIcon} size={11} strokeWidth={2} />
+                    </button>
+                    <button
+                      data-swapy-no-drag
                       onClick={() => removeTile(tile)}
-                      aria-label={`Remove ${labelOf(tile)}`}
+                      aria-label={`Delete ${labelOf(tile)}`}
+                      title="Delete"
                       className={`${CTL_BTN} top-1.5 right-1.5`}
                     >
                       <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
@@ -852,9 +1159,9 @@ function Bento({
       {/* ── ADD WEBSITE ── native <dialog>: focus trap, Esc, backdrop for free */}
       {editable && (
         <dialog ref={addDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(420px,calc(100vw-32px))] p-0`}>
-          <form onSubmit={addSite} className="flex flex-col gap-4 p-5">
+          <form onSubmit={addTile} className="flex flex-col gap-4 p-5">
             <div className="flex items-center justify-between">
-              <h2 className="m-0 text-base font-semibold">Add a link</h2>
+              <h2 className="m-0 text-base font-semibold">Add a tile</h2>
               <button
                 type="button"
                 onClick={() => addDialogRef.current?.close()}
@@ -866,45 +1173,62 @@ function Bento({
             </div>
             <fieldset className="flex flex-col gap-1.5">
               <legend className={`${SECTION} mb-1.5`}>Type</legend>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(
                   [
-                    ["bookmark", "Bookmark", "Site icon · down to 56px"],
-                    ["website", "Website", "Live preview · 192px+"],
+                    ["bookmark", "Bookmark", "Site icon"],
+                    ["website", "Website", "Live preview"],
+                    ["note", "Note", "Type anything"],
+                    ["todo", "To-do", "Checklist"],
                   ] as const
                 ).map(([value, label, hint]) => (
                   <label
                     key={value}
                     className="flex cursor-pointer flex-col gap-0.5 rounded-theme border border-line px-3 py-2 text-muted transition-colors hover:border-line-strong has-checked:border-accent has-checked:bg-accent/10 has-checked:text-fg has-focus-visible:outline-2 has-focus-visible:outline-accent"
                   >
-                    <input type="radio" name="kind" value={value} defaultChecked={value === "bookmark"} className="sr-only" />
+                    <input
+                      type="radio"
+                      name="kind"
+                      value={value}
+                      checked={addKind === value}
+                      onChange={() => setAddKind(value)}
+                      className="sr-only"
+                    />
                     <span className="text-sm font-medium">{label}</span>
                     <span className="text-[11px] text-faint">{hint}</span>
                   </label>
                 ))}
               </div>
             </fieldset>
-            <label className="flex flex-col gap-1.5">
-              <span className={SECTION}>URL</span>
-              <input
-                name="url"
-                required
-                autoFocus
-                inputMode="url"
-                autoComplete="url"
-                placeholder="example.com"
-                onInput={(e) => e.currentTarget.setCustomValidity("")}
-                className={FIELD}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className={SECTION}>
-                Title <span className="normal-case tracking-normal opacity-70">(optional)</span>
-              </span>
-              <input name="title" placeholder="Defaults to the domain" className={FIELD} />
-            </label>
+            {(addKind === "bookmark" || addKind === "website") && (
+              <>
+              <label className="flex flex-col gap-1.5">
+                <span className={SECTION}>URL</span>
+                <input
+                  name="url"
+                  required
+                  autoFocus
+                  inputMode="url"
+                  autoComplete="url"
+                  placeholder="example.com"
+                  onInput={(e) => e.currentTarget.setCustomValidity("")}
+                  className={FIELD}
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className={SECTION}>
+                  Title <span className="normal-case tracking-normal opacity-70">(optional)</span>
+                </span>
+                <input name="title" placeholder="Defaults to the domain" className={FIELD} />
+              </label>
+              </>
+            )}
             <p className="m-0 text-xs text-faint">
-              Hit Edit and drag a tile&apos;s corner to resize it in 56px steps.
+              {addKind === "note"
+                ? "Opens in edit mode so you can start typing."
+                : addKind === "todo"
+                ? "Add items right in the card."
+                : "Hit Edit and drag a tile\u2019s corner to resize it in 56px steps."}
             </p>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => addDialogRef.current?.close()} className={BTN}>
@@ -918,8 +1242,62 @@ function Bento({
         </dialog>
       )}
 
+      {/* ── ARCHIVE: cards hidden from the grid; restore puts them back where they were ── */}
+      {editable && (
+        <dialog ref={archiveDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(480px,calc(100vw-32px))] p-0`}>
+          <div className="flex flex-col gap-4 p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="m-0 text-base font-semibold">
+                Archive <span className="font-normal text-faint">({archived.length})</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => archiveDialogRef.current?.close()}
+                aria-label="Close"
+                className="grid size-7 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
+              </button>
+            </div>
+            {archived.length === 0 ? (
+              <p className="m-0 text-sm text-muted">
+                Nothing archived. In Edit mode, use a card&apos;s archive button (top-left) to move it here.
+              </p>
+            ) : (
+              <ul className="m-0 flex max-h-[60dvh] list-none flex-col gap-2 overflow-y-auto p-0">
+                {archived.map((t) => (
+                  <li key={t.id} className="flex items-center gap-3 rounded-theme border border-line px-3 py-2">
+                    {t.kind === "bookmark" || t.kind === "website" ? (
+                      <img src={favicon(t.url)} alt="" width={16} height={16} className="shrink-0" />
+                    ) : (
+                      <span
+                        className="size-2 shrink-0 rounded-theme bg-(--tone)"
+                        style={{ "--tone": t.tone === "plain" ? "var(--t-faint)" : TONE[t.tone] } as React.CSSProperties}
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm text-fg">{labelOf(t)}</div>
+                      <div className="text-[11px] text-faint">
+                        {KIND_LABEL[t.kind]} · {t.w}×{t.h}
+                      </div>
+                    </div>
+                    <button onClick={() => setArchived(t, false)} className={BTN}>
+                      <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={13} strokeWidth={1.75} />
+                      Restore
+                    </button>
+                    <button onClick={() => removeTile(t)} aria-label={`Delete ${labelOf(t)}`} title="Delete for good" className={BTN}>
+                      <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={1.75} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </dialog>
+      )}
+
       {/* ── FOOTER ── */}
-      <footer className="mx-auto mt-10 flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-line pt-5 text-xs text-faint">
+      <footer className="mt-10 flex w-full flex-wrap items-center justify-between gap-4 border-t border-line pt-5 text-xs text-faint">
         <span className="flex items-center gap-3">
           &copy; {new Date().getFullYear()} {SITE_NAME}
         </span>

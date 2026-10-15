@@ -25,7 +25,7 @@ export async function saveTiles(tiles: Tile[]) {
   const seen = new Set<string>();
   const now = new Date().toISOString();
   const rows = tiles.map((t, position) => {
-    const { id, kind, w, h, tone, ...props } = t;
+    const { id, kind, w, h, tone, archived, ...props } = t;
     const ok =
       typeof id === "string" &&
       SAFE_ID.test(id) &&
@@ -39,10 +39,10 @@ export async function saveTiles(tiles: Tile[]) {
       h >= MIN_SIZE[kind][1] &&
       h <= MAX_SPAN &&
       ((kind !== "bookmark" && kind !== "website") || isHttpUrl((t as { url?: unknown }).url)) &&
-      JSON.stringify(props).length <= 4000;
+      JSON.stringify(props).length <= 10000;
     if (!ok) throw new Error(`Invalid tile: ${String(id)}`);
     seen.add(id);
-    return { id, kind, position, w, h, tone, props, updated_at: now };
+    return { id, kind, position, w, h, tone, archived: archived === true, props, updated_at: now };
   });
   // Upsert first, then drop removed tiles, so a failure never loses a tile.
   if (rows.length) await write("POST", "tiles?on_conflict=id", rows, "resolution=merge-duplicates");

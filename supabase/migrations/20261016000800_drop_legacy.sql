@@ -1,10 +1,11 @@
--- Cleanup: the pre-56px tiles table, plus leftovers of an earlier trading-app
+-- Cleanup: the retired tiles tables (pre-56px, pre-archive), plus leftovers of an earlier trading-app
 -- template (its tables were dropped by hand on 2026-10-16; the drops below are
 -- no-ops then). The on_auth_user_created trigger inserts into the dropped
 -- public.profiles, so it has to go too. Migrations run as postgres, which
 -- doesn't own auth.users and can't drop the trigger directly; dropping our
 -- function with CASCADE removes the trigger along with it.
 drop table if exists public.tiles_legacy;
+drop table if exists public.tiles_legacy_kinds;
 do $$
 begin
   drop function if exists public.handle_new_user() cascade;
