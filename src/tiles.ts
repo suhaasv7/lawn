@@ -3,7 +3,8 @@
 // Changes made on the site (move/resize/add/remove) are saved in that browser and
 // override this list there; "Reset" brings these defaults back.
 
-export type Tone = "paper" | "red" | "blue" | "green" | "dark";
+// "accent" follows the active Theme Center theme; "plain" has no tint.
+export type Tone = "plain" | "accent" | "violet" | "blue" | "green" | "amber" | "rose";
 
 type Base = { id: string; tone: Tone; w: number; h: number };
 
@@ -22,7 +23,7 @@ export const TILES: Tile[] = [
     kind: "intro",
     w: 3,
     h: 2,
-    tone: "paper",
+    tone: "accent",
     name: SITE_NAME,
     blurb:
       "this is my lawn — a small patch of the internet where i keep things i make, links i like, and whatever else i feel like planting.",
@@ -32,7 +33,7 @@ export const TILES: Tile[] = [
     kind: "link",
     w: 2,
     h: 2,
-    tone: "red",
+    tone: "rose",
     url: "https://fits.sv7.space/",
     title: "fits",
     note: "wardrobe lookbook — log pieces, build outfits",
@@ -42,7 +43,7 @@ export const TILES: Tile[] = [
     kind: "list",
     w: 1,
     h: 1,
-    tone: "dark",
+    tone: "amber",
     label: "now",
     items: ["building fits", "making this site mine"],
   },
@@ -60,7 +61,7 @@ export const TILES: Tile[] = [
     kind: "note",
     w: 3,
     h: 1,
-    tone: "dark",
+    tone: "plain",
     label: "notes",
     text: "short thoughts, quotes and half-ideas will live here.",
   },
@@ -79,8 +80,8 @@ export const TILES: Tile[] = [
     kind: "note",
     w: 2,
     h: 1,
-    tone: "paper",
+    tone: "plain",
     label: "colophon",
-    text: "react · swapy · cascadia code. hit edit to move & resize.",
+    text: "built with next.js + swapy. edit to move & resize, theme to restyle.",
   },
 ];
