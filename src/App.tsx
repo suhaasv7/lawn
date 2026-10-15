@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { createSwapy, Swapy } from "swapy";
 import { SignInButton, SignInModal } from "./modules/auth";
 import { CounselModal } from "./components/CounselModal";
@@ -23,6 +24,7 @@ import {
   Call02Icon,
   Drag01Icon,
   RefreshIcon,
+  PencilEdit01Icon,
 } from "@hugeicons/core-free-icons";
 import "./App.css";
 
@@ -82,6 +84,7 @@ function App() {
   const [heroSearch, setHeroSearch] = useState("");
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [resetFeedback, setResetFeedback] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Estimator card state
   const [estimatorTier, setEstimatorTier] = useState<"audit" | "demand" | "defense">("audit");
@@ -92,20 +95,20 @@ function App() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // manualSwap: React owns the DOM. Swapy only reports swaps; letting it move
+    // nodes itself desyncs React's tree (cards vanish/duplicate, removeChild crash).
     const swapy = createSwapy(containerRef.current, {
       animation: "spring",
+      swapMode: "drop",
+      manualSwap: true,
+      enabled: false,
     });
 
     swapyRef.current = swapy;
 
-    swapy.onSwapEnd((event) => {
-      const updatedMap = event.slotItemMap.asObject;
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedMap));
-      } catch (err) {
-        console.error("Error persisting bento layout", err);
-      }
-      setSlotItemMap(updatedMap);
+    swapy.onSwap((event) => {
+      // Swapy re-reads the DOM next frame, so the render must land before then.
+      flushSync(() => setSlotItemMap(event.newSlotItemMap.asObject));
     });
 
     return () => {
@@ -114,12 +117,19 @@ function App() {
     };
   }, []);
 
-  const handleResetLayout = () => {
+  useEffect(() => {
+    swapyRef.current?.enable(isEditing);
+  }, [isEditing]);
+
+  useEffect(() => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {
-      console.error(e);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(slotItemMap));
+    } catch (err) {
+      console.error("Error persisting bento layout", err);
     }
+  }, [slotItemMap]);
+
+  const handleResetLayout = () => {
     setSlotItemMap({ ...DEFAULT_SLOT_MAP });
     setResetFeedback(true);
     setTimeout(() => setResetFeedback(false), 1600);
@@ -358,7 +368,7 @@ function App() {
               </div>
             </div>
             <div>
-              <div className="text-[2.2rem] font-bold tracking-tight mb-0.5">fits &nearr;</div>
+              <div className="text-[2.2rem] font-bold tracking-tight mb-0.5">fits ↗</div>
               <div className="text-[0.72rem] text-[rgba(245,240,232,0.75)] font-mono">fits.sv7.space</div>
             </div>
             <div className="text-[0.66rem] uppercase tracking-wider text-[rgba(245,240,232,0.55)]">
@@ -847,7 +857,21 @@ function App() {
         </div>
 
         <nav className="flex items-center gap-3 sm:gap-4 mt-2 sm:mt-0">
-          {/* Reset Grid Button */}
+          <button
+            onClick={() => setIsEditing((v) => !v)}
+            aria-pressed={isEditing}
+            title={isEditing ? "Finish rearranging" : "Rearrange cards"}
+            className={`flex items-center gap-1.5 text-[0.68rem] uppercase tracking-wider font-mono transition-colors border px-2.5 py-1 cursor-pointer ${
+              isEditing
+                ? "text-[#151411] bg-[#c59f52] border-[#c59f52]"
+                : "text-[rgba(236,231,219,0.75)] hover:text-[#c59f52] border-[#3d3830] bg-[#100f0d] hover:border-[#c59f52]"
+            }`}
+          >
+            <HugeiconsIcon icon={isEditing ? Tick01Icon : PencilEdit01Icon} size={13} strokeWidth={1.5} />
+            <span>{isEditing ? "Done" : "Edit"}</span>
+          </button>
+
+          {isEditing && (
           <button
             onClick={handleResetLayout}
             title="Reset Bento Grid Layout to Default"
@@ -856,6 +880,7 @@ function App() {
             <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.5} />
             <span>{resetFeedback ? "Layout Reset" : "Reset Grid"}</span>
           </button>
+          )}
 
           <button
             onClick={() => openCounsel("General Consultation")}
@@ -907,7 +932,7 @@ function App() {
       {/* ── SWAPY BENTO MASTER GRID ── */}
       <main
         ref={containerRef}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-[1240px] w-full mx-auto flex-grow"
+        className={`${isEditing ? "editing " : ""}grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-[1240px] w-full mx-auto flex-grow`}
         style={{ gridAutoRows: "minmax(180px, auto)" }}
       >
         {SLOTS_CONFIG.map((slot) => {

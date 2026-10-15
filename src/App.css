@@ -189,21 +189,22 @@ body {
   transition: transform 0.2s ease;
 }
 
-[data-swapy-item] {
+/* Drag affordances only in edit mode; touch-action stays default otherwise so mobile can scroll */
+.editing [data-swapy-item] {
   touch-action: none;
   cursor: grab;
 }
 
-[data-swapy-item]:active {
+.editing [data-swapy-item]:active {
   cursor: grabbing;
 }
 
-/* During drag, lift card and show glowing gold border */
+/* During drag, lift card and show glowing gold border.
+   No transform here: Swapy moves the card via inline transform. */
 [data-swapy-dragging] {
   opacity: 0.92;
   box-shadow: 0 24px 48px -10px rgba(0, 0, 0, 0.9), 0 0 0 2px var(--accent-gold) !important;
   z-index: 1000 !important;
-  transform: scale(1.02) !important;
   cursor: grabbing !important;
 }
 
@@ -216,6 +217,10 @@ body {
 }
 
 /* Drag grip indicator in card header */
+main:not(.editing) .drag-grip {
+  display: none;
+}
+
 .drag-grip {
   opacity: 0.45;
   transition: opacity 0.15s ease, color 0.15s ease;
