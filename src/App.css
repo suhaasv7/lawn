@@ -93,7 +93,7 @@ body {
   border-color: #554e43;
 }
 
-/* Corner registration marks for that architectural / legal drafting touch */
+/* Corner registration marks */
 .corner-crosshair::before,
 .corner-crosshair::after {
   content: '+';
@@ -116,70 +116,9 @@ body {
   right: 5px;
 }
 
-.bento-card:hover .corner-crosshair::before,
-.bento-card:hover .corner-crosshair::after {
+.corner-crosshair:hover::before,
+.corner-crosshair:hover::after {
   color: var(--accent-gold);
-}
-
-/* ── Interactive Pill & Buttons ── */
-.action-btn-parchment {
-  background-color: var(--bg-card-parchment);
-  color: var(--text-dark);
-  border: 1.5px solid var(--bg-card-parchment);
-  transition: all 0.2s ease;
-}
-
-.action-btn-parchment:hover {
-  background-color: transparent;
-  color: var(--text-parchment);
-}
-
-.action-btn-outline {
-  background-color: transparent;
-  color: var(--text-parchment);
-  border: 1.5px solid var(--text-parchment);
-  transition: all 0.2s ease;
-}
-
-.action-btn-outline:hover {
-  background-color: var(--text-parchment);
-  color: var(--text-dark);
-}
-
-/* ── Custom Wood Texture ── */
-.wood-card-gradient {
-  background: radial-gradient(circle at 85% 15%, #946931 0%, #5c3f1a 45%, #34220b 100%);
-  position: relative;
-}
-
-.wood-lines {
-  background: repeating-linear-gradient(
-    78deg,
-    transparent,
-    transparent 12px,
-    rgba(0, 0, 0, 0.18) 12px,
-    rgba(0, 0, 0, 0.18) 14px
-  );
-}
-
-/* ── Pulse animation for live online indicator ── */
-@keyframes livePulse {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
-  }
-}
-
-.live-indicator {
-  animation: livePulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 /* ── Swapy Drag & Drop Polish ── */
@@ -216,20 +155,18 @@ body {
   background-color: rgba(197, 159, 82, 0.07) !important;
 }
 
-/* Drag grip indicator in card header */
-main:not(.editing) .drag-grip {
-  display: none;
+/* Edit mode: dashed outline marks every tile as movable */
+.editing .bento-card {
+  outline: 1.5px dashed rgba(197, 159, 82, 0.55);
+  outline-offset: 3px;
 }
 
 .drag-grip {
-  opacity: 0.45;
-  transition: opacity 0.15s ease, color 0.15s ease;
-  user-select: none;
-}
-
-.bento-card:hover .drag-grip {
-  opacity: 0.9;
   color: var(--accent-gold);
+  background: rgba(14, 13, 11, 0.85);
+  border: 1px solid rgba(197, 159, 82, 0.5);
+  padding: 1px 8px;
+  line-height: 0;
 }
 
 /* ── Custom scrollbars ── */

@@ -1,7 +1,7 @@
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "./AuthContext";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Cancel01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import GoogleIcon from "@thesvg/react/google";
 
 export function SignInModal() {
@@ -35,9 +35,9 @@ export function SignInModal() {
         </button>
 
         <div className="flex items-center gap-2 mb-2 text-[#c59f52]">
-          <HugeiconsIcon icon={Shield01Icon} size={15} strokeWidth={1.5} color="#c59f52" />
+          <HugeiconsIcon icon={PencilEdit01Icon} size={15} strokeWidth={1.5} color="#c59f52" />
           <span className="text-[0.65rem] uppercase tracking-widest font-mono">
-            Client &amp; Counsel Portal
+            lawn. — owner
           </span>
         </div>
 
@@ -50,13 +50,13 @@ export function SignInModal() {
               Sign In
             </h2>
             <div className="text-[0.66rem] uppercase tracking-wider text-[rgba(236,231,219,0.5)] font-mono">
-              Google Workspace SSO
+              with Google
             </div>
           </div>
         </div>
 
         <p className="text-[0.76rem] text-[rgba(236,231,219,0.65)] mb-6 leading-relaxed">
-          Access your privileged matter filings and attorney correspondence.
+          Sign in to tend the lawn.
         </p>
 
         <div className="flex justify-center my-4">
@@ -72,9 +72,6 @@ export function SignInModal() {
           />
         </div>
 
-        <div className="text-[0.65rem] text-[rgba(236,231,219,0.4)] text-center mt-6 font-mono">
-          Privileged &amp; Confidential Attorney-Client Communication
-        </div>
       </div>
     </div>
   );
