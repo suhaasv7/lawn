@@ -7,8 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "db:migrate": "node --env-file=.env.local scripts/db-migrate.mjs"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^1.0.0",

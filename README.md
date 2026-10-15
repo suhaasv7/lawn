@@ -8,9 +8,10 @@ Personal bento-grid site — Next.js (App Router) + Tailwind v4 + Swapy, data in
 
 ## Supabase
 
-`npm run db:migrate` applies `supabase/migrations/*.sql` in order (each once) and
-stores the owner key. Needs `SUPABASE_ACCESS_TOKEN` in `.env.local` — a personal
-token from supabase.com/dashboard/account/tokens (local only).
+Schema and data changes are migrations in `supabase/migrations/` (`<timestamp>_<name>.sql`).
+The Supabase GitHub integration (Project Settings → Integrations → GitHub, "Deploy to
+production" on `main`) applies new ones automatically on every push to `main`.
+Add a table or rows = add a new migration file; never edit one that already ran.
 
 Tables are public-read; writes only go through `lawn_*` functions that check the owner secret.
 

@@ -62,7 +62,7 @@ create policy "Public read" on public.site_settings for select to anon, authenti
 revoke insert, update, delete, truncate on public.tiles, public.themes, public.site_settings
   from anon, authenticated;
 
--- ── Owner secret: only a sha256 is stored (set by scripts/db-migrate.mjs) ──
+-- ── Owner secret: only a sha256 is stored (see the lawn_owner_key migration) ──
 
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
