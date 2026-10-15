@@ -8,12 +8,9 @@ Personal bento-grid site — Next.js (App Router) + Tailwind v4 + Swapy, data in
 
 ## Supabase
 
-Run in the SQL editor, in order:
-
-1. `supabase/migrations/20261016000000_drop_legacy_tables.sql` (optional cleanup)
-2. `supabase/migrations/20261016000100_lawn_schema.sql`
-3. `supabase/migrations/20261016000200_lawn_seed.sql`
-4. `supabase/owner.local.sql` (local only — hash of `LAWN_WRITE_SECRET`)
+`npm run db:migrate` applies `supabase/migrations/*.sql` in order (each once) and
+stores the owner key. Needs `SUPABASE_ACCESS_TOKEN` in `.env.local` — a personal
+token from supabase.com/dashboard/account/tokens (local only).
 
 Tables are public-read; writes only go through `lawn_*` functions that check the owner secret.
 
