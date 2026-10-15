@@ -1,73 +1,199 @@
-@import url('https://fonts.googleapis.com/css2?family=Cascadia+Code:wght@200..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&display=swap');
 
-/* ── one font, everywhere ── */
+/* ── Global Monospace Editorial Aesthetic ── */
+:root {
+  --bg-canvas: #0e0d0b;
+  --bg-card-dark: #171513;
+  --bg-card-dark-alt: #1c1a17;
+  --bg-card-parchment: #ece7db;
+  --text-parchment: #ece7db;
+  --text-parchment-muted: rgba(236, 231, 219, 0.65);
+  --text-dark: #151411;
+  --text-dark-muted: rgba(21, 20, 17, 0.68);
+  --border-muted: #332f28;
+  --border-subtle: rgba(236, 231, 219, 0.12);
+  --accent-crimson: #8f2e22;
+  --accent-navy: #1f2c68;
+  --accent-forest: #224724;
+  --accent-gold: #c59f52;
+}
+
 html,
 body,
 *,
 *::before,
 *::after {
-  font-family: 'Cascadia Code', 'Courier New', monospace !important;
+  font-family: 'Cascadia Code', 'Courier New', monospace;
+  box-sizing: border-box;
 }
 
-/* ── dark canvas ── */
+/* ── Dark Canvas ── */
 html,
 body {
-  background-color: #100f0d;
+  background-color: var(--bg-canvas);
+  color: var(--text-parchment);
   color-scheme: dark;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── ticker animation ── */
+/* ── Smooth subtle grain / grid background ── */
+.canvas-bg {
+  background-color: var(--bg-canvas);
+  background-image: 
+    radial-gradient(rgba(236, 231, 219, 0.04) 1px, transparent 0),
+    radial-gradient(rgba(197, 159, 82, 0.02) 1px, transparent 0);
+  background-size: 24px 24px, 48px 48px;
+  background-position: 0 0, 12px 12px;
+}
+
+/* ── Ticker animation with fade masks ── */
 @keyframes ticker {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-wrapper {
+  mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 4%, black 96%, transparent);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
 }
 
 .ticker-track {
   display: flex;
-  animation: ticker 20s linear infinite;
+  width: max-content;
+  animation: ticker 25s linear infinite;
   white-space: nowrap;
 }
 
-/* ── card hover ── */
-.card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.card:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 4px 4px 0 #4a443b;
+.ticker-track:hover {
+  animation-play-state: paused;
 }
 
-/* ── icon cells ── */
-.icon-cell svg {
-  width: 48px;
-  height: 48px;
-  stroke: #f5f0e8;
-  fill: none;
-  stroke-width: 1.5;
+/* ── Bento Card Enhancements ── */
+.bento-card {
+  position: relative;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s ease;
+  border: 1.5px solid var(--border-muted);
 }
 
-.icon-cell-dark svg {
-  width: 28px;
-  height: 28px;
-  fill: #16150f;
-  opacity: 0.7;
+.bento-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(236, 231, 219, 0.15);
+  border-color: #554e43;
 }
 
-.icon-cell-grey svg {
-  width: 40px;
-  height: 40px;
-  stroke: #f5f0e8;
-  fill: none;
-  stroke-width: 1.5;
+/* Corner registration marks for that architectural / legal drafting touch */
+.corner-crosshair::before,
+.corner-crosshair::after {
+  content: '+';
+  position: absolute;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--border-muted);
+  pointer-events: none;
+  font-weight: 300;
+  transition: color 0.2s ease;
 }
 
-/* ── wood texture ── */
+.corner-crosshair::before {
+  top: 4px;
+  left: 5px;
+}
+
+.corner-crosshair::after {
+  bottom: 4px;
+  right: 5px;
+}
+
+.bento-card:hover .corner-crosshair::before,
+.bento-card:hover .corner-crosshair::after {
+  color: var(--accent-gold);
+}
+
+/* ── Interactive Pill & Buttons ── */
+.action-btn-parchment {
+  background-color: var(--bg-card-parchment);
+  color: var(--text-dark);
+  border: 1.5px solid var(--bg-card-parchment);
+  transition: all 0.2s ease;
+}
+
+.action-btn-parchment:hover {
+  background-color: transparent;
+  color: var(--text-parchment);
+}
+
+.action-btn-outline {
+  background-color: transparent;
+  color: var(--text-parchment);
+  border: 1.5px solid var(--text-parchment);
+  transition: all 0.2s ease;
+}
+
+.action-btn-outline:hover {
+  background-color: var(--text-parchment);
+  color: var(--text-dark);
+}
+
+/* ── Custom Wood Texture ── */
+.wood-card-gradient {
+  background: radial-gradient(circle at 85% 15%, #946931 0%, #5c3f1a 45%, #34220b 100%);
+  position: relative;
+}
+
 .wood-lines {
   background: repeating-linear-gradient(
-    90deg,
+    78deg,
     transparent,
-    transparent 8px,
-    rgba(0,0,0,0.3) 8px,
-    rgba(0,0,0,0.3) 9px
+    transparent 12px,
+    rgba(0, 0, 0, 0.18) 12px,
+    rgba(0, 0, 0, 0.18) 14px
   );
+}
+
+/* ── Pulse animation for live online indicator ── */
+@keyframes livePulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+.live-indicator {
+  animation: livePulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* ── Custom scrollbars ── */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #12100e;
+}
+::-webkit-scrollbar-thumb {
+  background: #38332c;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #554d42;
 }
