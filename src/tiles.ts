@@ -32,7 +32,6 @@ type Base = { id: string; tone: Tone; w: number; h: number; archived?: boolean }
 // embed: whether the site allows being shown in an iframe (checked when added;
 // false falls back to a screenshot). image: optional custom preview.
 // view: website preview at desktop width (default) or the site's mobile layout.
-// scroll: where the preview was last scrolled to, in the site's own pixels.
 // frame: website shown with border, header and title (default: full-bleed,
 // controls appear when you hover the top edge).
 type Link = {
@@ -42,7 +41,6 @@ type Link = {
   image?: string;
   embed?: boolean;
   view?: "desktop" | "mobile";
-  scroll?: number;
   frame?: boolean;
 };
 

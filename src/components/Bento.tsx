@@ -143,14 +143,11 @@ const Label = ({ children, dot }: { children: React.ReactNode; dot: boolean }) =
   </div>
 );
 
-// Website preview. Browsers don't let a page read or set the scroll position
-// inside another site's iframe, so while look-only the site is loaded as one
-// tall page (PAGE_H) and the tile scrolls over it — that scroll is ours to
-// save. While interacting, the iframe gets a real window the size of the tile
-// so the site lays out and scrolls normally (that scroll isn't saved). In
-// desktop view the site is laid out at DESKTOP_W and scaled down to the tile.
+// Website preview: the site gets a real window the size of the tile (in
+// desktop view it's laid out at DESKTOP_W and scaled down to fit). Look-only
+// previews can't be scrolled or clicked; only interact mode can. Browsers
+// don't expose another site's scroll position, so it isn't saved.
 const DESKTOP_W = 1280;
-const PAGE_H = 3200;
 
 // Full-bleed by default: the site covers the whole tile and the controls slide
 // in when you hover the top edge. The frame button switches to the bordered
@@ -193,30 +190,7 @@ function WebsiteTile({
   const boxW = box.w;
   const viewW = desktop ? DESKTOP_W : boxW;
   const scale = viewW ? boxW / viewW : 1;
-  // The site's window height: one tall page to scroll over, or exactly the tile.
-  const viewH = interactive ? box.h / scale : PAGE_H;
-
-  // Restore the saved position (also after a resize, a view change, or when
-  // interaction is switched off again).
-  const saved = tile.scroll ?? 0;
-  useEffect(() => {
-    const el = boxRef.current;
-    if (el && boxW && !interactive && Math.abs(el.scrollTop - saved * scale) > 2) el.scrollTop = saved * scale;
-  }, [saved, scale, boxW, interactive]);
-
-  const scrollTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const onScroll = () => {
-    clearTimeout(scrollTimer.current);
-    // Switching to the tile-sized window snaps this box to the top; that
-    // isn't a scroll to save.
-    if (interactive) return;
-    scrollTimer.current = setTimeout(() => {
-      const el = boxRef.current;
-      if (!el || !scale) return;
-      const y = Math.round(el.scrollTop / scale);
-      if (y !== saved) onChange({ scroll: y });
-    }, 400);
-  };
+  const viewH = box.h / scale;
 
   const header = (
     <>
@@ -227,7 +201,7 @@ function WebsiteTile({
           <button
             type="button"
             data-swapy-no-drag
-            onClick={() => onChange({ view: desktop ? "mobile" : "desktop", scroll: 0 })}
+            onClick={() => onChange({ view: desktop ? "mobile" : "desktop" })}
             title={desktop ? "Desktop view — switch to mobile" : "Mobile view — switch to desktop"}
             aria-label={desktop ? "Switch to mobile view" : "Switch to desktop view"}
             className={iconBtn}
@@ -274,16 +248,14 @@ function WebsiteTile({
   const preview = (
     <div
       ref={boxRef}
-      onScroll={onScroll}
-      className={`overflow-x-hidden bg-raised [scrollbar-width:thin] ${embed && !interactive ? "overflow-y-auto" : "overflow-hidden"} ${
+      className={`overflow-hidden bg-raised ${
         framed
           ? `relative min-h-0 min-w-0 flex-1 rounded-theme-sm border transition-colors ${interactive ? "border-accent ring-1 ring-accent" : "border-line"}`
           : `absolute inset-0 ${interactive ? "ring-2 ring-inset ring-accent" : ""}`
       }`}
     >
       {embed ? (
-        // Sizer gives the box the scaled page's height to scroll through.
-        <div className="relative" style={{ height: viewH * scale }}>
+        <div className="relative h-full">
           {boxW > 0 && (
             <iframe
               key={tile.view ?? "desktop"}
