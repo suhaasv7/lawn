@@ -1,8 +1,9 @@
+"use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { createSwapy, Swapy } from "swapy";
-import { SignInButton, SignInModal } from "./modules/auth";
-import { GithubIcon } from "./components/BrandIcons";
+import { GithubIcon } from "./BrandIcons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
@@ -14,8 +15,7 @@ import {
   RefreshIcon,
   PencilEdit01Icon,
 } from "@hugeicons/core-free-icons";
-import { TILES, SITE_NAME, Tile, Tone } from "./tiles";
-import "./App.css";
+import { TILES, SITE_NAME, Tile, Tone } from "@/tiles";
 
 const STORAGE_KEY = "lawn_tiles_v3";
 const TILE_IDS = TILES.map((t) => t.id);
@@ -61,13 +61,15 @@ const ARROWS: Record<string, [number, number]> = {
   ArrowUp: [0, -1],
 };
 
+// Starts empty so the server-rendered HTML matches the first client render.
 function Clock({ timeZone }: { timeZone: string }) {
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
+    setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  return <>{now.toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" })}</>;
+  return <>{now ? now.toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" }) : "--:--"}</>;
 }
 
 const Label = ({ children }: { children: React.ReactNode }) => (
@@ -211,8 +213,11 @@ function TileCard({ tile, isEditing }: { tile: Tile; isEditing: boolean }) {
   }
 }
 
-function App() {
-  const [tiles, setTiles] = useState<Tile[]>(loadTiles);
+function Bento() {
+  // Server renders the defaults; the saved layout is applied after mount
+  // (localStorage only exists in the browser).
+  const [tiles, setTiles] = useState<Tile[]>(TILES);
+  const loaded = useRef(false);
   // Bumped when tiles are added/removed/reset so Swapy re-reads the slots.
   // Not bumped on swap or resize: those keep the same slots and items.
   const [layoutVersion, setLayoutVersion] = useState(0);
@@ -259,6 +264,16 @@ function App() {
   }, [isEditing, layoutVersion]);
 
   useEffect(() => {
+    setTiles(loadTiles());
+    setLayoutVersion((v) => v + 1);
+  }, []);
+
+  useEffect(() => {
+    // Skip the mount run so the defaults don't overwrite the saved layout.
+    if (!loaded.current) {
+      loaded.current = true;
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tiles));
     } catch (err) {
@@ -380,8 +395,6 @@ function App() {
               <span>{resetFeedback ? "Layout Reset" : "Reset"}</span>
             </button>
           )}
-
-          <SignInButton />
         </nav>
       </header>
 
@@ -506,8 +519,6 @@ function App() {
         </form>
       </dialog>
 
-      <SignInModal />
-
       {/* ── FOOTER ── */}
       <footer
         className="bento-card flex flex-wrap justify-between items-center gap-4 px-6 py-4 mt-8 max-w-[1240px] w-full mx-auto text-[0.72rem] text-[rgba(236,231,219,0.55)]"
@@ -530,4 +541,4 @@ function App() {
   );
 }
 
-export default App;
+export default Bento;
