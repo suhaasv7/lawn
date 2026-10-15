@@ -1,5 +1,6 @@
--- Cleanup: leftover tables from an earlier trading-app template (all empty
--- when checked on 2026-10-16) plus the functions/trigger that use them.
+-- Cleanup of an earlier trading-app template. Its tables were dropped by hand
+-- on 2026-10-16 (the drops below are no-ops then); its functions and the
+-- auth trigger were still there.
 -- The on_auth_user_created trigger inserts into public.profiles, so it must go
 -- too or auth sign-ups would fail. Migrations run as postgres, which doesn't own
 -- auth.users and can't drop the trigger directly; dropping our function with
