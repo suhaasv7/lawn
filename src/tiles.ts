@@ -1,11 +1,11 @@
-// Everything on the grid lives here. Add a tile = add an object.
-// Order below is the default layout; visitors' rearrangements are saved locally
-// and new tiles get appended to the end of a saved layout.
+// Default grid. Add a tile = add an object (or use "+ Add" on the site).
+// w/h are in grid cells; a cell is a square (6 columns on desktop, 4 tablet, 2 phone).
+// Changes made on the site (move/resize/add/remove) are saved in that browser and
+// override this list there; "Reset" brings these defaults back.
 
-export type Size = "sm" | "wide" | "tall" | "lg"; // 1x1, 2x1, 1x2, 2x2
 export type Tone = "paper" | "red" | "blue" | "green" | "dark";
 
-type Base = { id: string; size: Size; tone: Tone };
+type Base = { id: string; tone: Tone; w: number; h: number };
 
 export type Tile =
   | (Base & { kind: "intro"; name: string; blurb: string })
@@ -20,7 +20,8 @@ export const TILES: Tile[] = [
   {
     id: "intro",
     kind: "intro",
-    size: "lg",
+    w: 3,
+    h: 2,
     tone: "paper",
     name: SITE_NAME,
     blurb:
@@ -29,7 +30,8 @@ export const TILES: Tile[] = [
   {
     id: "fits",
     kind: "link",
-    size: "tall",
+    w: 2,
+    h: 2,
     tone: "red",
     url: "https://fits.sv7.space/",
     title: "fits",
@@ -38,7 +40,8 @@ export const TILES: Tile[] = [
   {
     id: "now",
     kind: "list",
-    size: "sm",
+    w: 1,
+    h: 1,
     tone: "dark",
     label: "now",
     items: ["building fits", "making this site mine"],
@@ -46,7 +49,8 @@ export const TILES: Tile[] = [
   {
     id: "clock",
     kind: "clock",
-    size: "sm",
+    w: 1,
+    h: 1,
     tone: "green",
     label: "local time",
     timeZone: "Asia/Kolkata",
@@ -54,7 +58,8 @@ export const TILES: Tile[] = [
   {
     id: "notes",
     kind: "note",
-    size: "wide",
+    w: 3,
+    h: 1,
     tone: "dark",
     label: "notes",
     text: "short thoughts, quotes and half-ideas will live here.",
@@ -62,7 +67,8 @@ export const TILES: Tile[] = [
   {
     id: "github",
     kind: "link",
-    size: "sm",
+    w: 1,
+    h: 1,
     tone: "blue",
     url: "https://github.com/suhaasv7",
     title: "github",
@@ -71,9 +77,10 @@ export const TILES: Tile[] = [
   {
     id: "colophon",
     kind: "note",
-    size: "sm",
+    w: 2,
+    h: 1,
     tone: "paper",
     label: "colophon",
-    text: "react · swapy · cascadia code. hit edit to rearrange.",
+    text: "react · swapy · cascadia code. hit edit to move & resize.",
   },
 ];
