@@ -1,10 +1,11 @@
-// Default grid. Add a tile = add an object (or use "+ Add" on the site).
+// Default grid. The live grid is stored in Supabase (public.tiles); these are
+// the fallback when the database isn't reachable and what "Reset" restores.
 // w/h are in grid cells; a cell is a square (6 columns on desktop, 4 tablet, 2 phone).
-// Changes made on the site (move/resize/add/remove) are saved in that browser and
-// override this list there; "Reset" brings these defaults back.
 
-// "accent" follows the active Theme Center theme; "plain" has no tint.
-export type Tone = "plain" | "accent" | "violet" | "blue" | "green" | "amber" | "rose";
+export const KINDS = ["intro", "link", "note", "list", "clock"] as const;
+// "accent" follows the active theme; "plain" has no tint.
+export const TONES = ["plain", "accent", "violet", "blue", "green", "amber", "rose"] as const;
+export type Tone = (typeof TONES)[number];
 
 type Base = { id: string; tone: Tone; w: number; h: number };
 
@@ -82,6 +83,6 @@ export const TILES: Tile[] = [
     h: 1,
     tone: "plain",
     label: "colophon",
-    text: "built with next.js + swapy. edit to move & resize, theme to restyle.",
+    text: "built with next.js + supabase + swapy.",
   },
 ];

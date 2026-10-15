@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Cascadia_Code, JetBrains_Mono, Geist_Mono, Geist, Inter } from "next/font/google";
 import { SITE_NAME } from "@/tiles";
-import { THEME_SCRIPT } from "@/theme";
+import { themeVars } from "@/theme";
+import { activeTheme, getSiteData } from "@/lib/site";
 import "./globals.css";
 
 // Cascadia is the default; the rest are Theme Center options, so they're not
@@ -26,13 +27,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#09090b", colorScheme: "dark" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// Content and theme come from Supabase on every request.
+export const dynamic = "force-dynamic";
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The saved theme is rendered straight into <html>, so the first paint is already themed.
+  const data = await getSiteData();
+  const vars = themeVars(activeTheme(data), data.settings) as React.CSSProperties;
   return (
-    // The head script sets data-theme/data-font before hydration.
-    <html lang="en" className={fontVars} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-      </head>
+    <html lang="en" className={fontVars} style={vars} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

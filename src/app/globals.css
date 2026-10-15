@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 /* ── Theme variables ──
-   Theme Center sets data-theme / data-font on <html> and --t-radius inline.
-   The @theme block below turns these into Tailwind tokens, so utilities like
-   bg-surface, text-muted, border-line, rounded-theme follow the theme live. */
+   The active theme (from Supabase) is rendered as inline --t-* variables on
+   <html>, and Theme Center updates them live. These are only the fallback
+   (Midnight, Cascadia Code, sharp corners). The @theme block below turns them
+   into Tailwind tokens: bg-surface, text-muted, border-line, rounded-theme… */
 
-:root,
-[data-theme="midnight"] {
+:root {
   --t-bg: #09090b;
   --t-surface: #111114;
   --t-raised: #19191d;
@@ -18,86 +18,9 @@
   --t-accent: #8b5cf6;
   --t-glow-1: rgb(139 92 246 / 0.18);
   --t-glow-2: rgb(59 130 246 / 0.12);
-}
-
-[data-theme="carbon"] {
-  --t-bg: #000000;
-  --t-surface: #0a0a0a;
-  --t-raised: #151515;
-  --t-line: rgb(255 255 255 / 0.09);
-  --t-line-strong: rgb(255 255 255 / 0.18);
-  --t-fg: #ededed;
-  --t-muted: #a3a3a3;
-  --t-faint: #666666;
-  --t-accent: #ededed;
-  --t-glow-1: rgb(255 255 255 / 0.06);
-  --t-glow-2: rgb(255 255 255 / 0.03);
-}
-
-[data-theme="terminal"] {
-  --t-bg: #040806;
-  --t-surface: #08110b;
-  --t-raised: #0d1a11;
-  --t-line: rgb(74 222 128 / 0.12);
-  --t-line-strong: rgb(74 222 128 / 0.26);
-  --t-fg: #dcfce7;
-  --t-muted: #86b796;
-  --t-faint: #557a62;
-  --t-accent: #4ade80;
-  --t-glow-1: rgb(74 222 128 / 0.14);
-  --t-glow-2: rgb(34 211 238 / 0.07);
-}
-
-[data-theme="abyss"] {
-  --t-bg: #050816;
-  --t-surface: #0a0f22;
-  --t-raised: #10172f;
-  --t-line: rgb(148 163 255 / 0.1);
-  --t-line-strong: rgb(148 163 255 / 0.22);
-  --t-fg: #e6ebff;
-  --t-muted: #98a2c9;
-  --t-faint: #5f6996;
-  --t-accent: #22d3ee;
-  --t-glow-1: rgb(34 211 238 / 0.14);
-  --t-glow-2: rgb(99 102 241 / 0.16);
-}
-
-[data-theme="ember"] {
-  --t-bg: #0c0806;
-  --t-surface: #140e0a;
-  --t-raised: #1d140e;
-  --t-line: rgb(255 190 140 / 0.09);
-  --t-line-strong: rgb(255 190 140 / 0.2);
-  --t-fg: #fbf1e9;
-  --t-muted: #bba595;
-  --t-faint: #7d6a5d;
-  --t-accent: #fb923c;
-  --t-glow-1: rgb(251 146 60 / 0.16);
-  --t-glow-2: rgb(239 68 68 / 0.1);
-}
-
-[data-theme="rose"] {
-  --t-bg: #0d080c;
-  --t-surface: #160e14;
-  --t-raised: #20141d;
-  --t-line: rgb(255 170 220 / 0.09);
-  --t-line-strong: rgb(255 170 220 / 0.2);
-  --t-fg: #fdf0f7;
-  --t-muted: #c3a5b6;
-  --t-faint: #86677a;
-  --t-accent: #f472b6;
-  --t-glow-1: rgb(244 114 182 / 0.16);
-  --t-glow-2: rgb(167 139 250 / 0.12);
-}
-
-:root {
   --t-radius: 0px;
   --t-font: var(--font-cascadia);
 }
-[data-font="jetbrains"] { --t-font: var(--font-jetbrains); }
-[data-font="geist-mono"] { --t-font: var(--font-geist-mono); }
-[data-font="geist"] { --t-font: var(--font-geist); }
-[data-font="inter"] { --t-font: var(--font-inter); }
 
 @theme inline {
   --color-bg: var(--t-bg);

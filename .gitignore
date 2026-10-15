@@ -26,3 +26,6 @@ next-env.d.ts
 *.njsproj
 *.sln
 *.sw?
+
+# Local-only SQL (owner secret hash)
+supabase/*.local.sql

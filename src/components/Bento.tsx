@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { flushSync } from "react-dom";
+import { useRouter } from "next/navigation";
 import { createSwapy, Swapy } from "swapy";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -14,14 +15,30 @@ import {
   RefreshIcon,
   PencilEdit01Icon,
   PaintBoardIcon,
+  LockKeyIcon,
+  Logout02Icon,
 } from "@hugeicons/core-free-icons";
 import { GithubIcon } from "./BrandIcons";
 import { TILES, SITE_NAME, Tile, Tone } from "@/tiles";
-import { THEMES, FONTS, MAX_RADIUS, THEME_KEY, DEFAULT_THEME, ThemeSettings, parseTheme, applyTheme } from "@/theme";
+import {
+  BASE_KEYS,
+  BASE_LABELS,
+  DEFAULT_SETTINGS,
+  DEFAULT_THEME,
+  FONTS,
+  HEX,
+  MAX_RADIUS,
+  Settings,
+  Theme,
+  ThemeBase,
+  applyVars,
+  colorVars,
+  deriveTheme,
+  themeVars,
+} from "@/theme";
+import { deleteTheme, lock, saveSettings, saveTheme, saveTiles, unlock } from "@/app/actions";
 
-const TILES_KEY = "lawn_tiles_v3";
 const TILE_IDS = TILES.map((t) => t.id);
-const KINDS = ["intro", "link", "note", "list", "clock"];
 const MAX_H = 8;
 
 // Per-tile accent, exposed as --tone (bg-(--tone), text-(--tone), tile wash).
@@ -38,9 +55,9 @@ const TONE: Record<Tone, string> = {
 // Shared class sets. Every color/radius here is a theme token from globals.css,
 // so Theme Center restyles all of it live.
 const BTN =
-  "inline-flex items-center gap-1.5 h-8 px-3 rounded-theme border border-line bg-fg/5 text-muted text-[12.5px] font-medium whitespace-nowrap cursor-pointer transition-colors hover:text-fg hover:bg-fg/10 hover:border-line-strong aria-pressed:text-fg aria-pressed:border-accent/60 aria-pressed:bg-accent/15";
+  "inline-flex items-center gap-1.5 h-8 px-3 rounded-theme border border-line bg-fg/5 text-muted text-[12.5px] font-medium whitespace-nowrap cursor-pointer transition-colors hover:text-fg hover:bg-fg/10 hover:border-line-strong aria-pressed:text-fg aria-pressed:border-accent/60 aria-pressed:bg-accent/15 disabled:opacity-50 disabled:cursor-not-allowed";
 const BTN_PRIMARY =
-  "inline-flex items-center gap-1.5 h-8 px-3 rounded-theme border border-fg bg-fg text-bg text-[12.5px] font-medium whitespace-nowrap cursor-pointer transition-colors hover:bg-fg/85";
+  "inline-flex items-center gap-1.5 h-8 px-3 rounded-theme border border-fg bg-fg text-bg text-[12.5px] font-medium whitespace-nowrap cursor-pointer transition-colors hover:bg-fg/85 disabled:opacity-50 disabled:cursor-not-allowed";
 const CTL =
   "absolute z-[2] flex items-center justify-center min-w-6 h-6 px-1.5 text-[11px] leading-none text-fg bg-bg/80 backdrop-blur border border-line-strong rounded-theme";
 const CTL_BTN = `${CTL} cursor-pointer transition-colors hover:bg-fg hover:text-bg`;
@@ -49,37 +66,6 @@ const FIELD =
 const SECTION = "text-[11px] uppercase tracking-[0.14em] text-faint";
 const PANEL =
   "bg-surface/95 backdrop-blur-xl border border-line-strong rounded-theme text-fg shadow-[0_30px_80px_-20px_rgb(0_0_0/0.8)]";
-
-const parseTiles = (raw: unknown): Tile[] | null =>
-  Array.isArray(raw) && raw.every((t) => typeof t?.id === "string" && KINDS.includes(t.kind) && t.w >= 1 && t.h >= 1)
-    ? (raw as Tile[])
-    : null;
-
-// Saved per browser. The server renders `initial`; the saved value is applied
-// after mount (localStorage only exists in the browser). `ready` turns true once
-// that's happened, and nothing is written back before it.
-function useStored<T>(key: string, initial: T, parse: (raw: unknown) => T | null) {
-  const [value, setValue] = useState(initial);
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    try {
-      const saved = parse(JSON.parse(localStorage.getItem(key) ?? "null"));
-      if (saved) setValue(saved);
-    } catch (e) {
-      console.error(`Failed to read ${key}`, e);
-    }
-    setReady(true);
-  }, [key, parse]);
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error(`Failed to save ${key}`, e);
-    }
-  }, [key, value, ready]);
-  return [value, setValue, ready] as const;
-}
 
 const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 const favicon = (url: string) => `https://www.google.com/s2/favicons?domain=${host(url)}&sz=128`;
@@ -96,6 +82,17 @@ const ARROWS: Record<string, [number, number]> = {
   ArrowDown: [0, 1],
   ArrowUp: [0, -1],
 };
+
+type Draft = ThemeBase & { id?: string };
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+// The editor works on the five base colors; non-hex values fall back to Midnight's.
+const toDraft = (t: Theme): Draft =>
+  ({
+    id: t.is_preset ? undefined : t.id,
+    name: t.name,
+    ...Object.fromEntries(BASE_KEYS.map((k) => [k, HEX.test(t[k]) ? t[k] : DEFAULT_THEME[k]])),
+  }) as Draft;
 
 // Starts empty so the server-rendered HTML matches the first client render.
 function ClockFace({ timeZone }: { timeZone: string }) {
@@ -268,56 +265,134 @@ function TileCard({ tile, isEditing }: { tile: Tile; isEditing: boolean }) {
 }
 
 function ThemeCenter({
-  theme,
-  setTheme,
+  themes,
+  settings,
+  setSettings,
+  draft,
+  setDraft,
+  onSaveDraft,
+  onDeleteDraft,
+  busy,
 }: {
-  theme: ThemeSettings;
-  setTheme: React.Dispatch<React.SetStateAction<ThemeSettings>>;
+  themes: Theme[];
+  settings: Settings;
+  setSettings: React.Dispatch<React.SetStateAction<Settings>>;
+  draft: Draft | null;
+  setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
+  onSaveDraft: () => void;
+  onDeleteDraft: () => void;
+  busy: boolean;
 }) {
+  const active = themes.find((t) => t.id === settings.theme_id) ?? themes[0];
   return (
     // Native popover: light-dismiss + Esc, and non-modal so changes preview live.
     <div
       id="theme-center"
       popover="auto"
-      className={`${PANEL} fixed inset-auto top-[76px] right-[max(16px,calc((100vw-1240px)/2))] m-0 max-h-[calc(100dvh-96px)] w-[min(340px,calc(100vw-32px))] overflow-auto p-4`}
+      // Closing the panel discards an unsaved draft (and its live preview).
+      onToggle={(e) => (e.nativeEvent as ToggleEvent).newState === "closed" && setDraft(null)}
+      className={`${PANEL} fixed inset-auto top-[76px] right-[max(16px,calc((100vw-1240px)/2))] m-0 max-h-[calc(100dvh-96px)] w-[min(360px,calc(100vw-32px))] overflow-auto p-4`}
     >
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <h2 className="m-0 text-sm font-semibold">Theme center</h2>
-          <p className="m-0 mt-0.5 text-[11px] text-faint">Applies live · saved in this browser</p>
+          <p className="m-0 mt-0.5 text-[11px] text-faint">Applies live · saved to the site</p>
         </div>
-        <button className={BTN} onClick={() => setTheme(DEFAULT_THEME)}>
+        <button className={BTN} onClick={() => setSettings(DEFAULT_SETTINGS)} title="Midnight, Cascadia Code, sharp corners">
           <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.75} />
-          Reset
+          Defaults
         </button>
       </div>
 
-      <fieldset className="mb-5">
-        <legend className={`${SECTION} mb-2`}>Theme</legend>
-        <div className="grid grid-cols-3 gap-2">
-          {THEMES.map((t) => (
-            // data-theme on the swatch scopes that theme's tokens to it, so it previews itself.
-            <label
-              key={t.id}
-              data-theme={t.id}
-              className="flex cursor-pointer flex-col gap-1.5 rounded-theme border border-line bg-bg p-1.5 text-fg transition-colors hover:border-line-strong has-checked:border-accent has-checked:ring-1 has-checked:ring-accent has-focus-visible:outline-2 has-focus-visible:outline-accent"
-            >
-              <input
-                type="radio"
-                name="theme"
-                className="sr-only"
-                checked={theme.theme === t.id}
-                onChange={() => setTheme((s) => ({ ...s, theme: t.id }))}
-              />
-              <span className="relative h-10 overflow-hidden rounded-theme-sm border border-line bg-surface bg-[radial-gradient(90%_130%_at_0%_0%,var(--t-glow-1),transparent_70%)]">
-                <span className="absolute left-2 top-2 h-1 w-1/4 rounded-theme bg-fg/40" />
-                <span className="absolute bottom-2 left-2 h-1 w-2/5 rounded-theme bg-accent shadow-[0_0_10px_var(--t-accent)]" />
-              </span>
-              <span className="px-0.5 text-[11px]">{t.name}</span>
-            </label>
-          ))}
+      {draft ? (
+        <div className="mb-5 flex flex-col gap-3 rounded-theme border border-line-strong p-3">
+          <div className="flex items-center justify-between">
+            <span className={SECTION}>{draft.id ? "Edit theme" : "New theme"}</span>
+            <span className="text-[11px] text-faint">previewing live</span>
+          </div>
+          <input
+            aria-label="Theme name"
+            className={FIELD}
+            value={draft.name}
+            maxLength={40}
+            onChange={(e) => setDraft((d) => d && { ...d, name: e.target.value })}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            {BASE_KEYS.map((k) => (
+              <label key={k} className="flex cursor-pointer items-center gap-2 text-xs text-muted">
+                <input
+                  type="color"
+                  value={draft[k]}
+                  onChange={(e) => setDraft((d) => d && { ...d, [k]: e.target.value })}
+                  className="h-7 w-9 shrink-0 cursor-pointer rounded-theme-sm border border-line bg-transparent p-0.5"
+                />
+                {BASE_LABELS[k]}
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-between gap-2">
+            {draft.id ? (
+              <button className={BTN} onClick={onDeleteDraft} disabled={busy}>
+                Delete
+              </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <button className={BTN} onClick={() => setDraft(null)}>
+                Cancel
+              </button>
+              <button className={BTN_PRIMARY} onClick={onSaveDraft} disabled={busy || !draft.name.trim()}>
+                Save theme
+              </button>
+            </div>
+          </div>
         </div>
-      </fieldset>
+      ) : (
+        <fieldset className="mb-5">
+          <legend className={`${SECTION} mb-2`}>Theme</legend>
+          <div className="grid grid-cols-3 gap-2">
+            {themes.map((t) => (
+              <div key={t.id} className="relative">
+                {/* The swatch carries its own theme's tokens, so it previews itself. */}
+                <label
+                  style={colorVars(t) as React.CSSProperties}
+                  className="flex cursor-pointer flex-col gap-1.5 rounded-theme border border-line bg-bg p-1.5 text-fg transition-colors hover:border-line-strong has-checked:border-accent has-checked:ring-1 has-checked:ring-accent has-focus-visible:outline-2 has-focus-visible:outline-accent"
+                >
+                  <input
+                    type="radio"
+                    name="theme"
+                    className="sr-only"
+                    checked={active?.id === t.id}
+                    onChange={() => setSettings((s) => ({ ...s, theme_id: t.id }))}
+                  />
+                  <span className="relative h-10 overflow-hidden rounded-theme-sm border border-line bg-surface bg-[radial-gradient(90%_130%_at_0%_0%,var(--t-glow-1),transparent_70%)]">
+                    <span className="absolute left-2 top-2 h-1 w-1/4 rounded-theme bg-fg/40" />
+                    <span className="absolute bottom-2 left-2 h-1 w-2/5 rounded-theme bg-accent shadow-[0_0_10px_var(--t-accent)]" />
+                  </span>
+                  <span className="truncate px-0.5 text-[11px]">{t.name}</span>
+                </label>
+                {!t.is_preset && (
+                  <button
+                    onClick={() => setDraft(toDraft(t))}
+                    aria-label={`Edit ${t.name}`}
+                    className={`${CTL_BTN} top-1 right-1 size-6 min-w-0 p-0`}
+                  >
+                    <HugeiconsIcon icon={PencilEdit01Icon} size={11} strokeWidth={2} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => setDraft({ ...toDraft(active ?? DEFAULT_THEME), id: undefined, name: `${active?.name ?? "My"} copy` })}
+              className="flex min-h-[78px] cursor-pointer flex-col items-center justify-center gap-1 rounded-theme border border-dashed border-line-strong text-[11px] text-muted transition-colors hover:border-accent hover:text-fg"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.75} />
+              New theme
+            </button>
+          </div>
+        </fieldset>
+      )}
 
       <fieldset className="mb-5">
         <legend className={`${SECTION} mb-2`}>Font</legend>
@@ -332,8 +407,8 @@ function ThemeCenter({
                 type="radio"
                 name="font"
                 className="sr-only"
-                checked={theme.font === f.id}
-                onChange={() => setTheme((s) => ({ ...s, font: f.id }))}
+                checked={settings.font === f.id}
+                onChange={() => setSettings((s) => ({ ...s, font: f.id }))}
               />
               <span>{f.name}</span>
               <span className="text-faint">Aa 0123</span>
@@ -345,15 +420,15 @@ function ThemeCenter({
       <label className="block">
         <span className={`${SECTION} mb-2 flex justify-between`}>
           <span>Corners</span>
-          <span className="normal-case tracking-normal text-muted">{theme.radius}px</span>
+          <span className="normal-case tracking-normal text-muted">{settings.radius}px</span>
         </span>
         <input
           type="range"
           min={0}
           max={MAX_RADIUS}
           step={2}
-          value={theme.radius}
-          onChange={(e) => setTheme((s) => ({ ...s, radius: Number(e.target.value) }))}
+          value={settings.radius}
+          onChange={(e) => setSettings((s) => ({ ...s, radius: Number(e.target.value) }))}
           className="w-full accent-accent"
         />
         <span className="mt-1 flex justify-between text-[10px] text-faint">
@@ -365,31 +440,89 @@ function ThemeCenter({
   );
 }
 
-function Bento() {
-  const [tiles, setTiles, tilesReady] = useStored(TILES_KEY, TILES, parseTiles);
-  const [theme, setTheme, themeReady] = useStored(THEME_KEY, DEFAULT_THEME, parseTheme);
+function Bento({
+  initialTiles,
+  initialThemes,
+  initialSettings,
+  owner,
+  canUnlock,
+}: {
+  initialTiles: Tile[];
+  initialThemes: Theme[];
+  initialSettings: Settings;
+  owner: boolean;
+  canUnlock: boolean;
+}) {
+  const router = useRouter();
+  const [tiles, setTiles] = useState(initialTiles);
+  const [themes, setThemes] = useState(initialThemes);
+  const [settings, setSettings] = useState(initialSettings);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   // Bumped when tiles are added/removed/reset so Swapy re-reads the slots.
   // Not bumped on swap or resize: those keep the same slots and items.
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [resetFeedback, setResetFeedback] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [entering, setEntering] = useState(true);
+  const editing = owner && isEditing;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const swapyRef = useRef<Swapy | null>(null);
   const addDialogRef = useRef<HTMLDialogElement>(null);
+  const unlockDialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 1400);
     return () => clearTimeout(t);
   }, []);
 
-  // The <head> script already applied the saved theme before paint; only take
-  // over once the saved value is loaded, so the defaults never flash.
+  // ── Theme: the server already rendered the saved one; this keeps <html> in
+  // sync with Theme Center (including the unsaved draft being edited).
+  const active = themes.find((t) => t.id === settings.theme_id) ?? themes[0] ?? DEFAULT_THEME;
   useEffect(() => {
-    if (themeReady) applyTheme(theme);
-  }, [theme, themeReady]);
+    applyVars(themeVars(draft ? { ...active, ...deriveTheme(draft) } : active, settings));
+  }, [draft, active, settings]);
 
+  // ── Saving: changes are written to Supabase shortly after they stop.
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const persist = useCallback((key: string, run: () => Promise<unknown>) => {
+    clearTimeout(timers.current[key]);
+    setSaveState("saving");
+    timers.current[key] = setTimeout(() => {
+      run().then(
+        () => setSaveState("saved"),
+        (e) => {
+          console.error(e);
+          setSaveState("error");
+        }
+      );
+    }, 600);
+  }, []);
+
+  const savedTiles = useRef(JSON.stringify(initialTiles));
+  useEffect(() => {
+    if (!owner) return;
+    const json = JSON.stringify(tiles);
+    if (json === savedTiles.current) return;
+    persist("tiles", async () => {
+      await saveTiles(tiles);
+      savedTiles.current = json;
+    });
+  }, [tiles, owner, persist]);
+
+  const savedSettings = useRef(JSON.stringify(initialSettings));
+  useEffect(() => {
+    if (!owner) return;
+    const json = JSON.stringify(settings);
+    if (json === savedSettings.current) return;
+    persist("settings", async () => {
+      await saveSettings(settings);
+      savedSettings.current = json;
+    });
+  }, [settings, owner, persist]);
+
+  // ── Swapy
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -419,11 +552,11 @@ function Bento() {
       swapy.destroy();
       swapyRef.current = null;
     };
-  }, [layoutVersion, tilesReady, setTiles]);
+  }, [layoutVersion]);
 
   useEffect(() => {
-    swapyRef.current?.enable(isEditing);
-  }, [isEditing, layoutVersion, tilesReady]);
+    swapyRef.current?.enable(editing);
+  }, [editing, layoutVersion]);
 
   const cols = () => getComputedStyle(containerRef.current!).gridTemplateColumns.split(" ").length;
 
@@ -507,11 +640,67 @@ function Bento() {
     setTimeout(() => setResetFeedback(false), 1600);
   };
 
+  // ── Theme editor
+  const saveDraft = async () => {
+    if (!draft) return;
+    setSaveState("saving");
+    try {
+      const saved = await saveTheme(draft);
+      setThemes((prev) => (prev.some((t) => t.id === saved.id) ? prev.map((t) => (t.id === saved.id ? saved : t)) : [...prev, saved]));
+      setSettings((s) => ({ ...s, theme_id: saved.id }));
+      setDraft(null);
+      setSaveState("saved");
+    } catch (e) {
+      console.error(e);
+      setSaveState("error");
+    }
+  };
+
+  const deleteDraft = async () => {
+    const id = draft?.id;
+    if (!id || !confirm(`Delete the "${draft.name}" theme?`)) return;
+    setSaveState("saving");
+    try {
+      await deleteTheme(id);
+      const rest = themes.filter((t) => t.id !== id);
+      setThemes(rest);
+      if (settings.theme_id === id) setSettings((s) => ({ ...s, theme_id: rest[0]?.id ?? null }));
+      setDraft(null);
+      setSaveState("saved");
+    } catch (e) {
+      console.error(e);
+      setSaveState("error");
+    }
+  };
+
+  // ── Owner session
+  const submitUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const input = form.elements.namedItem("passphrase") as HTMLInputElement;
+    if (await unlock(input.value)) {
+      form.reset();
+      unlockDialogRef.current?.close();
+      router.refresh();
+    } else {
+      input.setCustomValidity("Wrong passphrase");
+      input.reportValidity();
+    }
+  };
+
+  const signOut = async () => {
+    setIsEditing(false);
+    await lock();
+    router.refresh();
+  };
+
+  const saveLabel = { idle: "", saving: "Saving…", saved: "Saved", error: "Couldn't save" }[saveState];
+
   return (
     <div className="flex min-h-screen flex-col p-4 sm:p-6 lg:p-8">
       {/* ── TOP NAV ── */}
       <header className="sticky top-3 z-40 mx-auto mb-5 flex w-full max-w-[1240px] items-center justify-between gap-3 rounded-theme border border-line bg-bg/70 px-4 py-2.5 backdrop-blur-xl backdrop-saturate-150">
-        <a href="#" className="flex items-center text-[15px] font-semibold tracking-tight text-fg no-underline">
+        <a href="#" className="flex h-8 items-center text-[15px] font-semibold tracking-tight text-fg no-underline">
           lawn
           <span
             aria-hidden
@@ -519,41 +708,63 @@ function Bento() {
           />
         </a>
 
-        <nav className="flex flex-wrap items-center justify-end gap-2">
-          {isEditing && (
-            <button onClick={handleResetLayout} title="Reset layout to default" className={BTN}>
-              <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.75} />
-              <span className="hidden sm:inline">{resetFeedback ? "Layout reset" : "Reset"}</span>
+        {owner && (
+          <nav className="flex flex-wrap items-center justify-end gap-2">
+            <span
+              aria-live="polite"
+              className={`hidden text-[11px] sm:inline ${saveState === "error" ? "text-[#fb7185]" : "text-faint"}`}
+            >
+              {saveLabel}
+            </span>
+            {editing && (
+              <button onClick={handleResetLayout} title="Reset layout to default" className={BTN}>
+                <HugeiconsIcon icon={RefreshIcon} size={14} strokeWidth={1.75} />
+                <span className="hidden sm:inline">{resetFeedback ? "Layout reset" : "Reset"}</span>
+              </button>
+            )}
+            <button popoverTarget="theme-center" aria-label="Theme center" className={BTN}>
+              <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={1.75} />
+              <span className="hidden sm:inline">Theme</span>
             </button>
-          )}
-          <button popoverTarget="theme-center" aria-label="Theme center" className={BTN}>
-            <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={1.75} />
-            <span className="hidden sm:inline">Theme</span>
-          </button>
-          <button
-            onClick={() => setIsEditing((v) => !v)}
-            aria-pressed={isEditing}
-            title={isEditing ? "Finish editing" : "Move and resize tiles"}
-            className={BTN}
-          >
-            <HugeiconsIcon icon={isEditing ? Tick01Icon : PencilEdit01Icon} size={14} strokeWidth={1.75} />
-            <span>{isEditing ? "Done" : "Edit"}</span>
-          </button>
-          <button onClick={() => addDialogRef.current?.showModal()} className={BTN_PRIMARY}>
-            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
-            <span>Add</span>
-          </button>
-        </nav>
+            <button
+              onClick={() => setIsEditing((v) => !v)}
+              aria-pressed={editing}
+              title={editing ? "Finish editing" : "Move and resize tiles"}
+              className={BTN}
+            >
+              <HugeiconsIcon icon={editing ? Tick01Icon : PencilEdit01Icon} size={14} strokeWidth={1.75} />
+              <span>{editing ? "Done" : "Edit"}</span>
+            </button>
+            <button onClick={() => addDialogRef.current?.showModal()} className={BTN_PRIMARY}>
+              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
+              <span>Add</span>
+            </button>
+            <button onClick={signOut} aria-label="Lock editing" title="Lock editing" className={BTN}>
+              <HugeiconsIcon icon={Logout02Icon} size={14} strokeWidth={1.75} />
+            </button>
+          </nav>
+        )}
       </header>
 
-      <ThemeCenter theme={theme} setTheme={setTheme} />
+      {owner && (
+        <ThemeCenter
+          themes={themes}
+          settings={settings}
+          setSettings={setSettings}
+          draft={draft}
+          setDraft={setDraft}
+          onSaveDraft={saveDraft}
+          onDeleteDraft={deleteDraft}
+          busy={saveState === "saving"}
+        />
+      )}
 
       {/* ── BENTO GRID: square cells, tiles span w x h of them ── */}
       <div className="bento-wrap mx-auto w-full max-w-[1240px]">
         <main
           ref={containerRef}
           onPointerMove={trackPointer}
-          className={`bento-grid${isEditing ? " editing" : ""}${entering ? " entering" : ""}`}
+          className={`bento-grid${editing ? " editing" : ""}${entering ? " entering" : ""}`}
         >
           {tiles.map((tile, i) => (
             <div
@@ -562,8 +773,8 @@ function Bento() {
               style={{ "--w": tile.w, "--h": tile.h, "--i": i } as React.CSSProperties}
             >
               <div key={tile.id} data-swapy-item={tile.id} className="relative h-full w-full">
-                <TileCard tile={tile} isEditing={isEditing} />
-                {isEditing && (
+                <TileCard tile={tile} isEditing={editing} />
+                {editing && (
                   <>
                     <div
                       aria-hidden
@@ -605,56 +816,104 @@ function Bento() {
       </div>
 
       {/* ── ADD WEBSITE ── native <dialog>: focus trap, Esc, backdrop for free */}
-      <dialog ref={addDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(420px,calc(100vw-32px))] p-0`}>
-        <form onSubmit={addSite} className="flex flex-col gap-4 p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="m-0 text-base font-semibold">Add a website</h2>
-            <button
-              type="button"
-              onClick={() => addDialogRef.current?.close()}
-              aria-label="Close"
-              className="grid size-7 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
-            </button>
-          </div>
-          <label className="flex flex-col gap-1.5">
-            <span className={SECTION}>URL</span>
-            <input
-              name="url"
-              required
-              autoFocus
-              inputMode="url"
-              autoComplete="url"
-              placeholder="example.com"
-              onInput={(e) => e.currentTarget.setCustomValidity("")}
-              className={FIELD}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className={SECTION}>
-              Title <span className="normal-case tracking-normal opacity-70">(optional)</span>
-            </span>
-            <input name="title" placeholder="Defaults to the domain" className={FIELD} />
-          </label>
-          <p className="m-0 text-xs text-faint">
-            Starts as a 1×1 tile showing the site&apos;s icon — hit Edit and drag its corner to make it bigger.
-          </p>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => addDialogRef.current?.close()} className={BTN}>
-              Cancel
-            </button>
-            <button type="submit" className={BTN_PRIMARY}>
-              Add website
-            </button>
-          </div>
-        </form>
-      </dialog>
+      {owner && (
+        <dialog ref={addDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(420px,calc(100vw-32px))] p-0`}>
+          <form onSubmit={addSite} className="flex flex-col gap-4 p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="m-0 text-base font-semibold">Add a website</h2>
+              <button
+                type="button"
+                onClick={() => addDialogRef.current?.close()}
+                aria-label="Close"
+                className="grid size-7 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
+              </button>
+            </div>
+            <label className="flex flex-col gap-1.5">
+              <span className={SECTION}>URL</span>
+              <input
+                name="url"
+                required
+                autoFocus
+                inputMode="url"
+                autoComplete="url"
+                placeholder="example.com"
+                onInput={(e) => e.currentTarget.setCustomValidity("")}
+                className={FIELD}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className={SECTION}>
+                Title <span className="normal-case tracking-normal opacity-70">(optional)</span>
+              </span>
+              <input name="title" placeholder="Defaults to the domain" className={FIELD} />
+            </label>
+            <p className="m-0 text-xs text-faint">
+              Starts as a 1×1 tile showing the site&apos;s icon — hit Edit and drag its corner to make it bigger.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => addDialogRef.current?.close()} className={BTN}>
+                Cancel
+              </button>
+              <button type="submit" className={BTN_PRIMARY}>
+                Add website
+              </button>
+            </div>
+          </form>
+        </dialog>
+      )}
+
+      {/* ── UNLOCK (owner only; no accounts, just the passphrase) ── */}
+      {canUnlock && !owner && (
+        <dialog ref={unlockDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(380px,calc(100vw-32px))] p-0`}>
+          <form onSubmit={submitUnlock} className="flex flex-col gap-4 p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="m-0 text-base font-semibold">Unlock editing</h2>
+              <button
+                type="button"
+                onClick={() => unlockDialogRef.current?.close()}
+                aria-label="Close"
+                className="grid size-7 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
+              </button>
+            </div>
+            <label className="flex flex-col gap-1.5">
+              <span className={SECTION}>Passphrase</span>
+              <input
+                name="passphrase"
+                type="password"
+                required
+                autoFocus
+                autoComplete="current-password"
+                onInput={(e) => e.currentTarget.setCustomValidity("")}
+                className={FIELD}
+              />
+            </label>
+            <div className="flex justify-end">
+              <button type="submit" className={BTN_PRIMARY}>
+                Unlock
+              </button>
+            </div>
+          </form>
+        </dialog>
+      )}
 
       {/* ── FOOTER ── */}
       <footer className="mx-auto mt-10 flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-line pt-5 text-xs text-faint">
-        <span>
+        <span className="flex items-center gap-3">
           &copy; {new Date().getFullYear()} {SITE_NAME}
+          {canUnlock && !owner && (
+            <button
+              onClick={() => unlockDialogRef.current?.showModal()}
+              aria-label="Unlock editing"
+              title="Unlock editing"
+              className="grid size-6 cursor-pointer place-items-center rounded-theme text-faint transition-colors hover:bg-fg/10 hover:text-fg"
+            >
+              <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={1.75} />
+            </button>
+          )}
         </span>
         <a
           href="https://github.com/suhaasv7"
