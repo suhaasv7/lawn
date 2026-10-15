@@ -69,7 +69,6 @@ export function SignInModal() {
             shape="rectangular"
             size="large"
             text="signin_with"
-            locale="en"
           />
         </div>
 
