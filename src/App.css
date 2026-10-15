@@ -88,7 +88,7 @@ body {
 }
 
 .bento-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(236, 231, 219, 0.15);
   border-color: #554e43;
 }
@@ -180,6 +180,51 @@ body {
 
 .live-indicator {
   animation: livePulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* ── Swapy Drag & Drop Polish ── */
+[data-swapy-slot] {
+  min-height: 160px;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+[data-swapy-item] {
+  touch-action: none;
+  cursor: grab;
+}
+
+[data-swapy-item]:active {
+  cursor: grabbing;
+}
+
+/* During drag, lift card and show glowing gold border */
+[data-swapy-dragging] {
+  opacity: 0.92;
+  box-shadow: 0 24px 48px -10px rgba(0, 0, 0, 0.9), 0 0 0 2px var(--accent-gold) !important;
+  z-index: 1000 !important;
+  transform: scale(1.02) !important;
+  cursor: grabbing !important;
+}
+
+/* Target slot highlight */
+[data-swapy-highlighted] {
+  outline: 2px dashed var(--accent-gold) !important;
+  outline-offset: -3px;
+  border-radius: 2px;
+  background-color: rgba(197, 159, 82, 0.07) !important;
+}
+
+/* Drag grip indicator in card header */
+.drag-grip {
+  opacity: 0.45;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.bento-card:hover .drag-grip {
+  opacity: 0.9;
+  color: var(--accent-gold);
 }
 
 /* ── Custom scrollbars ── */

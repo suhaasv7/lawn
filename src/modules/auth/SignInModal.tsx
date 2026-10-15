@@ -1,7 +1,7 @@
 import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "./AuthContext";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Cancel01Icon, ShieldCheckIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
 import GoogleIcon from "@thesvg/react/google";
 
 export function SignInModal() {
@@ -35,7 +35,7 @@ export function SignInModal() {
         </button>
 
         <div className="flex items-center gap-2 mb-2 text-[#c59f52]">
-          <HugeiconsIcon icon={ShieldCheckIcon} size={15} strokeWidth={1.5} color="#c59f52" />
+          <HugeiconsIcon icon={Shield01Icon} size={15} strokeWidth={1.5} color="#c59f52" />
           <span className="text-[0.65rem] uppercase tracking-widest font-mono">
             Client &amp; Counsel Portal
           </span>
@@ -59,19 +59,22 @@ export function SignInModal() {
           Access your privileged matter filings and attorney correspondence.
         </p>
 
-        <div className="flex justify-center pb-2">
+        <div className="flex justify-center my-4">
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
-            onError={() => console.error("Google sign-in failed")}
-            shape="rectangular"
+            onError={() => {
+              console.error("Sign-in failed");
+            }}
             theme="filled_black"
+            shape="rectangular"
             size="large"
-            width="300"
+            text="signin_with"
+            locale="en"
           />
         </div>
 
-        <div className="mt-6 pt-4 border-t border-[#332f28] text-center text-[0.65rem] text-[rgba(236,231,219,0.5)] font-mono">
-          Strict 256-Bit Encrypted Authentication
+        <div className="text-[0.65rem] text-[rgba(236,231,219,0.4)] text-center mt-6 font-mono">
+          Privileged &amp; Confidential Attorney-Client Communication
         </div>
       </div>
     </div>

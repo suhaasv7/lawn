@@ -7,7 +7,6 @@ import {
   Clock01Icon,
   SentIcon,
   BalanceScaleIcon,
-  ShieldCheckIcon,
 } from "@hugeicons/core-free-icons";
 
 interface CounselModalProps {
@@ -178,7 +177,7 @@ export const CounselModal: React.FC<CounselModalProps> = ({
               </div>
 
               <div className="flex items-center justify-center gap-2 text-[0.68rem] text-[rgba(236,231,219,0.5)] pt-1">
-                <HugeiconsIcon icon={ShieldCheckIcon} size={14} strokeWidth={1.5} color="#c59f52" />
+                <HugeiconsIcon icon={Shield01Icon} size={14} strokeWidth={1.5} color="#c59f52" />
                 Protected by Rule 1.6 Attorney-Client Confidentiality
               </div>
             </form>
