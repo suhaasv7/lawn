@@ -2,24 +2,22 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { flushSync } from "react-dom";
-import { useRouter } from "next/navigation";
 import { createSwapy, Swapy } from "swapy";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
   ArrowUpRight01Icon,
   ArrowExpandDiagonal01Icon,
+  Cursor01Icon,
   Cancel01Icon,
   Tick01Icon,
   Drag01Icon,
   RefreshIcon,
   PencilEdit01Icon,
   PaintBoardIcon,
-  LockKeyIcon,
-  Logout02Icon,
 } from "@hugeicons/core-free-icons";
 import { GithubIcon } from "./BrandIcons";
-import { TILES, SITE_NAME, Tile, Tone } from "@/tiles";
+import { ADD_SIZE, MAX_SPAN, MIN_SIZE, TILES, SITE_NAME, Tile, Tone } from "@/tiles";
 import {
   BASE_KEYS,
   BASE_LABELS,
@@ -36,10 +34,9 @@ import {
   deriveTheme,
   themeVars,
 } from "@/theme";
-import { deleteTheme, lock, saveSettings, saveTheme, saveTiles, unlock } from "@/app/actions";
+import { canEmbed, deleteTheme, saveSettings, saveTheme, saveTiles } from "@/app/actions";
 
 const TILE_IDS = TILES.map((t) => t.id);
-const MAX_H = 8;
 
 // Per-tile accent, exposed as --tone (bg-(--tone), text-(--tone), tile wash).
 const TONE: Record<Tone, string> = {
@@ -59,7 +56,7 @@ const BTN =
 const BTN_PRIMARY =
   "inline-flex items-center gap-1.5 h-8 px-3 rounded-theme border border-fg bg-fg text-bg text-[12.5px] font-medium whitespace-nowrap cursor-pointer transition-colors hover:bg-fg/85 disabled:opacity-50 disabled:cursor-not-allowed";
 const CTL =
-  "absolute z-[2] flex items-center justify-center min-w-6 h-6 px-1.5 text-[11px] leading-none text-fg bg-bg/80 backdrop-blur border border-line-strong rounded-theme";
+  "absolute z-[2] flex items-center justify-center min-w-5 h-5 px-1 text-[10px] leading-none text-fg bg-bg/80 backdrop-blur border border-line-strong rounded-theme";
 const CTL_BTN = `${CTL} cursor-pointer transition-colors hover:bg-fg hover:text-bg`;
 const FIELD =
   "w-full bg-fg/5 border border-line rounded-theme px-3 py-2 text-sm text-fg placeholder:text-faint outline-none transition focus:border-accent focus:ring-3 focus:ring-accent/25";
@@ -69,7 +66,8 @@ const PANEL =
 
 const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 const favicon = (url: string) => `https://www.google.com/s2/favicons?domain=${host(url)}&sz=128`;
-const labelOf = (t: Tile) => (t.kind === "link" ? t.title : t.kind === "intro" ? t.name : t.label);
+const labelOf = (t: Tile) =>
+  t.kind === "bookmark" || t.kind === "website" ? t.title : t.kind === "intro" ? t.name : t.label;
 
 // ponytail: microlink's free tier (~50 previews/day per visitor IP); set `image`
 // on the tile or self-host screenshots if that ever runs dry.
@@ -127,6 +125,87 @@ const Label = ({ children, dot }: { children: React.ReactNode; dot: boolean }) =
   </div>
 );
 
+// Website: the live site in an iframe (or a screenshot if it refuses to be
+// framed). Look-only by default; the cursor button turns interaction on.
+// Always look-only while editing so dragging works.
+function WebsiteTile({
+  tile,
+  isEditing,
+  style,
+}: {
+  tile: Extract<Tile, { kind: "website" }>;
+  isEditing: boolean;
+  style: React.CSSProperties;
+}) {
+  const [live, setLive] = useState(false);
+  const interactive = live && !isEditing;
+  const site = host(tile.url);
+  const embed = tile.embed !== false && !tile.image;
+  const iconBtn =
+    "grid size-7 shrink-0 cursor-pointer place-items-center rounded-theme border border-line text-muted transition-colors hover:border-line-strong hover:text-fg";
+  const guard = (e: React.MouseEvent) => isEditing && e.preventDefault();
+
+  return (
+    <div className="tile group flex h-full w-full flex-col gap-3 p-4" style={style}>
+      <div className="flex items-center gap-2 text-[11px] text-faint">
+        <img src={favicon(tile.url)} alt="" width={14} height={14} draggable={false} className="shrink-0" />
+        <span className="min-w-0 truncate">{site}</span>
+        {embed && !isEditing && (
+          <button
+            type="button"
+            onClick={() => setLive((v) => !v)}
+            aria-pressed={live}
+            title={live ? "Stop interacting" : "Interact with the site"}
+            className={`${iconBtn} ml-auto aria-pressed:border-accent aria-pressed:bg-accent/15 aria-pressed:text-fg`}
+          >
+            <HugeiconsIcon icon={live ? Cancel01Icon : Cursor01Icon} size={13} strokeWidth={1.75} />
+          </button>
+        )}
+        <a
+          href={tile.url}
+          target="_blank"
+          rel="noreferrer"
+          draggable={false}
+          onClick={guard}
+          aria-label={`Open ${site} in a new tab`}
+          className={`${iconBtn} ${embed && !isEditing ? "" : "ml-auto"}`}
+        >
+          <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} strokeWidth={1.75} />
+        </a>
+      </div>
+      <div
+        className={`relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-theme-sm border bg-raised transition-colors ${interactive ? "border-accent ring-1 ring-accent" : "border-line"}`}
+      >
+        {embed ? (
+          <iframe
+            src={tile.url}
+            title={`${tile.title} (${site})`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            tabIndex={interactive ? 0 : -1}
+            className={`absolute inset-0 h-full w-full border-0 ${interactive ? "" : "pointer-events-none"}`}
+          />
+        ) : (
+          // absolute img: a 2560px screenshot must not stretch the grid row
+          <img
+            src={tile.image ?? preview(tile.url)}
+            alt={`Preview of ${site}`}
+            loading="lazy"
+            draggable={false}
+            className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition duration-500 group-hover:scale-[1.03] group-hover:opacity-100"
+            onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+          />
+        )}
+      </div>
+      <a href={tile.url} target="_blank" rel="noreferrer" draggable={false} onClick={guard} className="min-w-0 text-fg no-underline">
+        <div className="truncate text-base font-semibold leading-tight tracking-tight">{tile.title}</div>
+        <div className="truncate text-xs text-muted">{tile.note ?? site}</div>
+      </a>
+    </div>
+  );
+}
+
 function TileCard({ tile, isEditing }: { tile: Tile; isEditing: boolean }) {
   const style = { "--tone": TONE[tile.tone] ?? "transparent" } as React.CSSProperties;
   const base = "tile w-full h-full flex";
@@ -151,7 +230,8 @@ function TileCard({ tile, isEditing }: { tile: Tile; isEditing: boolean }) {
         </div>
       );
 
-    case "link": {
+    case "bookmark":
+    case "website": {
       const site = host(tile.url);
       const linkProps = {
         href: tile.url,
@@ -173,62 +253,33 @@ function TileCard({ tile, isEditing }: { tile: Tile; isEditing: boolean }) {
           {icon(size)}
         </span>
       );
-      const shot = (
-        // absolute img: a 2560px screenshot must not stretch the grid row
-        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-theme-sm border border-line bg-raised">
-          <img
-            src={tile.image ?? preview(tile.url)}
-            alt={`Preview of ${site}`}
-            loading="lazy"
-            draggable={false}
-            className="absolute inset-0 h-full w-full object-cover object-top opacity-90 transition duration-500 group-hover:scale-[1.03] group-hover:opacity-100"
-            onError={(e) => (e.currentTarget.style.visibility = "hidden")}
-          />
-        </div>
-      );
-      const titleBlock = (
-        <div className="min-w-0">
-          <div className="truncate text-base font-semibold leading-tight tracking-tight">{tile.title}</div>
-          <div className="truncate text-xs text-muted">{tile.note ?? site}</div>
-        </div>
-      );
-
-      // 1x1: just the favicon, app-icon style.
-      if (tile.w === 1 && tile.h === 1) {
+      // Bookmark: just the icon at one cell wide; the name joins once there's room.
+      if (tile.kind === "bookmark") {
+        if (tile.w === 1) {
+          return (
+            <a {...linkProps} className={`${base} group items-center justify-center`}>
+              <span className="transition-transform duration-300 group-hover:scale-110">{icon(28)}</span>
+            </a>
+          );
+        }
+        if (tile.h === 1) {
+          return (
+            <a {...linkProps} className={`${base} group items-center gap-2.5 px-3`}>
+              {icon(22)}
+              <span className="min-w-0 truncate text-[13px] font-medium">{tile.title}</span>
+            </a>
+          );
+        }
+        const big = tile.w >= 3 && tile.h >= 3;
         return (
-          <a {...linkProps} className={`${base} group flex-col items-center justify-center gap-3 p-3`}>
-            {appIcon("size-14", 30)}
+          <a {...linkProps} className={`${base} group flex-col items-center justify-center gap-2.5 p-3`}>
+            {appIcon(big ? "size-14" : "size-11", big ? 30 : 24)}
             <span className="max-w-full truncate text-xs text-muted">{tile.title}</span>
           </a>
         );
       }
 
-      // One row tall: details on the left, preview strip on the right.
-      if (tile.h === 1) {
-        return (
-          <a {...linkProps} className={`${base} group gap-4 p-4`}>
-            <div className="flex w-[42%] min-w-0 shrink-0 flex-col justify-between">
-              {appIcon("size-10", 20)}
-              {titleBlock}
-            </div>
-            {shot}
-          </a>
-        );
-      }
-
-      return (
-        <a {...linkProps} className={`${base} group flex-col gap-3 p-4`}>
-          <div className="flex items-center gap-2 text-[11px] text-faint">
-            {icon(14)}
-            <span className="truncate">{site}</span>
-            <span className="ml-auto grid size-7 shrink-0 place-items-center rounded-theme border border-line text-muted transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:text-fg">
-              <HugeiconsIcon icon={ArrowUpRight01Icon} size={14} strokeWidth={1.75} />
-            </span>
-          </div>
-          {shot}
-          {titleBlock}
-        </a>
-      );
+      return <WebsiteTile tile={tile} isEditing={isEditing} style={style} />;
     }
 
     case "note":
@@ -444,16 +495,13 @@ function Bento({
   initialTiles,
   initialThemes,
   initialSettings,
-  owner,
-  canUnlock,
+  editable,
 }: {
   initialTiles: Tile[];
   initialThemes: Theme[];
   initialSettings: Settings;
-  owner: boolean;
-  canUnlock: boolean;
+  editable: boolean;
 }) {
-  const router = useRouter();
   const [tiles, setTiles] = useState(initialTiles);
   const [themes, setThemes] = useState(initialThemes);
   const [settings, setSettings] = useState(initialSettings);
@@ -465,12 +513,11 @@ function Bento({
   const [resetFeedback, setResetFeedback] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [entering, setEntering] = useState(true);
-  const editing = owner && isEditing;
+  const editing = editable && isEditing;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const swapyRef = useRef<Swapy | null>(null);
   const addDialogRef = useRef<HTMLDialogElement>(null);
-  const unlockDialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 1400);
@@ -502,25 +549,25 @@ function Bento({
 
   const savedTiles = useRef(JSON.stringify(initialTiles));
   useEffect(() => {
-    if (!owner) return;
+    if (!editable) return;
     const json = JSON.stringify(tiles);
     if (json === savedTiles.current) return;
     persist("tiles", async () => {
       await saveTiles(tiles);
       savedTiles.current = json;
     });
-  }, [tiles, owner, persist]);
+  }, [tiles, editable, persist]);
 
   const savedSettings = useRef(JSON.stringify(initialSettings));
   useEffect(() => {
-    if (!owner) return;
+    if (!editable) return;
     const json = JSON.stringify(settings);
     if (json === savedSettings.current) return;
     persist("settings", async () => {
       await saveSettings(settings);
       savedSettings.current = json;
     });
-  }, [settings, owner, persist]);
+  }, [settings, editable, persist]);
 
   // ── Swapy
   useEffect(() => {
@@ -560,28 +607,32 @@ function Bento({
 
   const cols = () => getComputedStyle(containerRef.current!).gridTemplateColumns.split(" ").length;
 
-  const resize = (id: string, w: number, h: number) => {
-    const cw = Math.max(1, Math.min(w, cols()));
-    const ch = Math.max(1, Math.min(h, MAX_H));
+  // Each type has its own smallest size (a bookmark can be one 56px cell, a
+  // website needs room for its preview); the most is the grid's width.
+  const resize = (tile: Tile, w: number, h: number) => {
+    const [minW, minH] = MIN_SIZE[tile.kind];
+    const cw = Math.max(minW, Math.min(w, cols(), MAX_SPAN));
+    const ch = Math.max(minH, Math.min(h, MAX_SPAN));
     setTiles((prev) =>
-      prev.some((t) => t.id === id && (t.w !== cw || t.h !== ch))
-        ? prev.map((t) => (t.id === id ? { ...t, w: cw, h: ch } : t))
+      prev.some((t) => t.id === tile.id && (t.w !== cw || t.h !== ch))
+        ? prev.map((t) => (t.id === tile.id ? { ...t, w: cw, h: ch } : t))
         : prev
     );
   };
 
-  // Drag the corner: every cell (+gap) of pointer travel adds/removes a cell.
-  // Cells are square, so one step size works for both axes.
+  // Drag the corner: every 56px cell (+gap) of pointer travel adds/removes a
+  // cell. Cells are square, so one step size works for both axes.
   const startResize = (e: React.PointerEvent, tile: Tile) => {
     e.preventDefault();
     const grid = containerRef.current!;
     const n = cols();
-    const step = (grid.clientWidth + parseFloat(getComputedStyle(grid).columnGap)) / n;
+    const css = getComputedStyle(grid);
+    const step = parseFloat(css.gridTemplateColumns) + parseFloat(css.columnGap);
     const x0 = e.clientX;
     const y0 = e.clientY;
     const w0 = Math.min(tile.w, n);
     const move = (ev: PointerEvent) =>
-      resize(tile.id, w0 + Math.round((ev.clientX - x0) / step), tile.h + Math.round((ev.clientY - y0) / step));
+      resize(tile, w0 + Math.round((ev.clientX - x0) / step), tile.h + Math.round((ev.clientY - y0) / step));
     const stop = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
@@ -607,7 +658,7 @@ function Bento({
     setLayoutVersion((v) => v + 1);
   };
 
-  const addSite = (e: React.FormEvent<HTMLFormElement>) => {
+  const addSite = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const urlInput = form.elements.namedItem("url") as HTMLInputElement;
@@ -626,7 +677,10 @@ function Bento({
       return;
     }
     const title = (form.elements.namedItem("title") as HTMLInputElement).value.trim() || host(href);
-    setTiles((prev) => [...prev, { id: `link-${Date.now()}`, kind: "link", url: href, title, tone: "plain", w: 1, h: 1 }]);
+    const kind = (form.elements.namedItem("kind") as RadioNodeList).value === "website" ? "website" : "bookmark";
+    const [w, h] = ADD_SIZE[kind];
+    const embed = kind === "website" ? await canEmbed(href) : undefined;
+    setTiles((prev) => [...prev, { id: `link-${Date.now()}`, kind, url: href, title, tone: "plain", w, h, embed }]);
     setLayoutVersion((v) => v + 1);
     form.reset();
     addDialogRef.current?.close();
@@ -673,27 +727,6 @@ function Bento({
     }
   };
 
-  // ── Owner session
-  const submitUnlock = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const input = form.elements.namedItem("passphrase") as HTMLInputElement;
-    if (await unlock(input.value)) {
-      form.reset();
-      unlockDialogRef.current?.close();
-      router.refresh();
-    } else {
-      input.setCustomValidity("Wrong passphrase");
-      input.reportValidity();
-    }
-  };
-
-  const signOut = async () => {
-    setIsEditing(false);
-    await lock();
-    router.refresh();
-  };
-
   const saveLabel = { idle: "", saving: "Saving…", saved: "Saved", error: "Couldn't save" }[saveState];
 
   return (
@@ -708,7 +741,7 @@ function Bento({
           />
         </a>
 
-        {owner && (
+        {editable && (
           <nav className="flex flex-wrap items-center justify-end gap-2">
             <span
               aria-live="polite"
@@ -739,14 +772,11 @@ function Bento({
               <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={2} />
               <span>Add</span>
             </button>
-            <button onClick={signOut} aria-label="Lock editing" title="Lock editing" className={BTN}>
-              <HugeiconsIcon icon={Logout02Icon} size={14} strokeWidth={1.75} />
-            </button>
           </nav>
         )}
       </header>
 
-      {owner && (
+      {editable && (
         <ThemeCenter
           themes={themes}
           settings={settings}
@@ -776,23 +806,27 @@ function Bento({
                 <TileCard tile={tile} isEditing={editing} />
                 {editing && (
                   <>
-                    <div
-                      aria-hidden
-                      className={`${CTL} pointer-events-none top-2 left-1/2 -translate-x-1/2 px-2.5`}
-                    >
-                      <HugeiconsIcon icon={Drag01Icon} size={14} strokeWidth={1.75} />
-                    </div>
+                    {tile.w > 1 && tile.h > 1 && (
+                      <div
+                        aria-hidden
+                        className={`${CTL} pointer-events-none top-1.5 left-1/2 -translate-x-1/2 px-2`}
+                      >
+                        <HugeiconsIcon icon={Drag01Icon} size={12} strokeWidth={1.75} />
+                      </div>
+                    )}
                     <button
                       data-swapy-no-drag
                       onClick={() => removeTile(tile)}
                       aria-label={`Remove ${labelOf(tile)}`}
-                      className={`${CTL_BTN} top-2 right-2`}
+                      className={`${CTL_BTN} top-1.5 right-1.5`}
                     >
-                      <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+                      <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
                     </button>
-                    <span aria-hidden className={`${CTL} pointer-events-none bottom-2 left-2`}>
-                      {tile.w}×{tile.h}
-                    </span>
+                    {tile.w > 1 && tile.h > 1 && (
+                      <span aria-hidden className={`${CTL} pointer-events-none bottom-1.5 left-1.5`}>
+                        {tile.w}×{tile.h}
+                      </span>
+                    )}
                     <button
                       data-swapy-no-drag
                       onPointerDown={(e) => startResize(e, tile)}
@@ -800,12 +834,12 @@ function Bento({
                         const d = ARROWS[e.key];
                         if (!d) return;
                         e.preventDefault();
-                        resize(tile.id, tile.w + d[0], tile.h + d[1]);
+                        resize(tile, tile.w + d[0], tile.h + d[1]);
                       }}
                       aria-label={`Resize ${labelOf(tile)}, ${tile.w} by ${tile.h}. Drag, or use arrow keys.`}
-                      className={`${CTL_BTN} right-2 bottom-2 cursor-nwse-resize touch-none`}
+                      className={`${CTL_BTN} right-1.5 bottom-1.5 cursor-nwse-resize touch-none`}
                     >
-                      <HugeiconsIcon icon={ArrowExpandDiagonal01Icon} size={12} strokeWidth={2} />
+                      <HugeiconsIcon icon={ArrowExpandDiagonal01Icon} size={11} strokeWidth={2} />
                     </button>
                   </>
                 )}
@@ -816,11 +850,11 @@ function Bento({
       </div>
 
       {/* ── ADD WEBSITE ── native <dialog>: focus trap, Esc, backdrop for free */}
-      {owner && (
+      {editable && (
         <dialog ref={addDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(420px,calc(100vw-32px))] p-0`}>
           <form onSubmit={addSite} className="flex flex-col gap-4 p-5">
             <div className="flex items-center justify-between">
-              <h2 className="m-0 text-base font-semibold">Add a website</h2>
+              <h2 className="m-0 text-base font-semibold">Add a link</h2>
               <button
                 type="button"
                 onClick={() => addDialogRef.current?.close()}
@@ -830,6 +864,26 @@ function Bento({
                 <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
               </button>
             </div>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className={`${SECTION} mb-1.5`}>Type</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ["bookmark", "Bookmark", "Site icon · down to 56px"],
+                    ["website", "Website", "Live preview · 192px+"],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <label
+                    key={value}
+                    className="flex cursor-pointer flex-col gap-0.5 rounded-theme border border-line px-3 py-2 text-muted transition-colors hover:border-line-strong has-checked:border-accent has-checked:bg-accent/10 has-checked:text-fg has-focus-visible:outline-2 has-focus-visible:outline-accent"
+                  >
+                    <input type="radio" name="kind" value={value} defaultChecked={value === "bookmark"} className="sr-only" />
+                    <span className="text-sm font-medium">{label}</span>
+                    <span className="text-[11px] text-faint">{hint}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <label className="flex flex-col gap-1.5">
               <span className={SECTION}>URL</span>
               <input
@@ -850,50 +904,14 @@ function Bento({
               <input name="title" placeholder="Defaults to the domain" className={FIELD} />
             </label>
             <p className="m-0 text-xs text-faint">
-              Starts as a 1×1 tile showing the site&apos;s icon — hit Edit and drag its corner to make it bigger.
+              Hit Edit and drag a tile&apos;s corner to resize it in 56px steps.
             </p>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => addDialogRef.current?.close()} className={BTN}>
                 Cancel
               </button>
               <button type="submit" className={BTN_PRIMARY}>
-                Add website
-              </button>
-            </div>
-          </form>
-        </dialog>
-      )}
-
-      {/* ── UNLOCK (owner only; no accounts, just the passphrase) ── */}
-      {canUnlock && !owner && (
-        <dialog ref={unlockDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(380px,calc(100vw-32px))] p-0`}>
-          <form onSubmit={submitUnlock} className="flex flex-col gap-4 p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="m-0 text-base font-semibold">Unlock editing</h2>
-              <button
-                type="button"
-                onClick={() => unlockDialogRef.current?.close()}
-                aria-label="Close"
-                className="grid size-7 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
-              </button>
-            </div>
-            <label className="flex flex-col gap-1.5">
-              <span className={SECTION}>Passphrase</span>
-              <input
-                name="passphrase"
-                type="password"
-                required
-                autoFocus
-                autoComplete="current-password"
-                onInput={(e) => e.currentTarget.setCustomValidity("")}
-                className={FIELD}
-              />
-            </label>
-            <div className="flex justify-end">
-              <button type="submit" className={BTN_PRIMARY}>
-                Unlock
+                Add
               </button>
             </div>
           </form>
@@ -904,16 +922,6 @@ function Bento({
       <footer className="mx-auto mt-10 flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-line pt-5 text-xs text-faint">
         <span className="flex items-center gap-3">
           &copy; {new Date().getFullYear()} {SITE_NAME}
-          {canUnlock && !owner && (
-            <button
-              onClick={() => unlockDialogRef.current?.showModal()}
-              aria-label="Unlock editing"
-              title="Unlock editing"
-              className="grid size-6 cursor-pointer place-items-center rounded-theme text-faint transition-colors hover:bg-fg/10 hover:text-fg"
-            >
-              <HugeiconsIcon icon={LockKeyIcon} size={13} strokeWidth={1.75} />
-            </button>
-          )}
         </span>
         <a
           href="https://github.com/suhaasv7"
