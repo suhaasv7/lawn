@@ -48,7 +48,8 @@ lookbook app) lives next to it and appears as a website card.
 | App | Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind v4 (PostCSS, `@theme` tokens), Swapy (grid drag), Hugeicons |
 | Hosting | Vercel project `lawn` (`prj_01P4dfH5AW43IraB1tPlC5KLjhke`), team `suhaasvijay's projects` (`team_SEmue22W9j5MV05WZVzVukq4`). `vercel.json` pins `framework: nextjs` (project was created as Vite) and `regions: ["hnd1"]` (Tokyo, next to the DB). Domain `lawn.sv7.space` via Cloudflare → Vercel. |
 | Database | Supabase project **"Lawn"**, ref `rqdkxgtoccuvuxqkyxzf`, region ap-northeast-1 (Tokyo), Postgres 17. Accessed server-side only over REST with plain `fetch` (no supabase-js). |
-| Env vars (Vercel + `.env.local`) | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`), `LAWN_WRITE_SECRET` (server-only; sha256 stored in `private.owner`). `OWNER_PASSPHRASE` and `VITE_GOOGLE_CLIENT_ID` are obsolete and can be deleted from Vercel. |
+| Env vars (Vercel + `.env.local`) | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`), `LAWN_WRITE_SECRET` (server-only; sha256 stored in `private.owner`). Backups: `NOTION_TOKEN` (Notion internal integration secret, `ntn_…`) — optional `NOTION_BACKUP_PAGE_ID`, optional `CRON_SECRET`. `OWNER_PASSPHRASE` and `VITE_GOOGLE_CLIENT_ID` are obsolete and can be deleted from Vercel. |
+| Notion | Backup destination. Private page **"lawn backups"** (id `3fb92f02-8cea-814f-94d5-c72404bc73bb`) created 2026-10-16 via the Notion MCP. The site's integration must be connected to it (••• → Connections). Notion MCP is also connected for Claude at local scope. |
 | MCP | Supabase MCP added at local scope for `~/Documents/personal` (read-only calls work; destructive SQL is auto-declined — §5). Vercel MCP returns 403 for this team's project/env endpoints (needs re-auth to that scope); there's no Vercel CLI. |
 | Fonts | next/font: Cascadia Code (default, preloaded), JetBrains Mono, Geist Mono, Geist, Inter (not preloaded). |
 
@@ -57,10 +58,13 @@ lookbook app) lives next to it and appears as a website card.
 ```
 src/app/layout.tsx      fonts; reads site data; renders active theme as inline --t-* vars on <html>; force-dynamic
 src/app/page.tsx        reads site data → <Bento editable=…/>
-src/app/actions.ts      server actions: saveTiles, saveSettings, saveTheme, deleteTheme, canEmbed (all validate input)
+src/app/actions.ts      server actions: saveTiles, saveZones, saveSettings, saveTheme (upsert), deleteTheme, canEmbed, listBackups, backupNow, restoreBackup (all validate input)
+src/app/api/backup/route.ts  daily backup endpoint for Vercel Cron (vercel.json `crons`: 20:30 UTC ≈ 02:00 IST)
 src/app/globals.css     theme vars + @theme tokens, tile utility, 56px grid + container-query columns, edit-mode cells, swapy styles
 src/lib/db.ts           REST helpers: select(), write() (adds x-lawn-secret header)
-src/lib/site.ts         getSiteData(): tiles/themes/settings per request; falls back to code defaults (read-only) if DB fails
+src/lib/site.ts         getSiteData(): tiles/zones/themes/settings per request; falls back to code defaults (read-only) if DB fails
+src/lib/backup.ts       collect() all data straight from Supabase (never the fallback) + runBackup()
+src/lib/notion.ts       Notion REST client (plain fetch, API 2022-06-28): databases under the backup page, snapshots, mirror, read/list
 src/tiles.ts            tile kinds, tones, MIN_SIZE / ADD_SIZE, Tile type, default TILES (fallback + "Reset")
 src/theme.ts            Theme/Settings types, FONTS, DEFAULT_THEME/SETTINGS, deriveTheme (5 base colours → full palette), themeVars
 src/components/Bento.tsx  the app shell: nav (mode switch, zone bar), grid (Swapy), Add / Archive / Theme Center dialogs, autosave
@@ -157,6 +161,19 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   delete (cards stay). **Nav**: a Zones dropdown (only zone names, no "All");
   picking one pans so the zone's centre is mid-screen, keeping the current
   zoom. The last zone (and mode) is saved; the board reopens centred on it at 100%.
+- **Backups → Notion** ("Backup" button in the nav opens the Backups dialog):
+  daily via Vercel Cron (`/api/backup`, skipped if the last snapshot is <12h
+  old; if `CRON_SECRET` is set only Vercel's call is accepted) and "Back up
+  now" (skipped if <1 min). Under the "lawn backups" page the code creates
+  three inline databases: **lawn snapshots** (one row per backup; the page body
+  is the full JSON — tiles, zones, custom themes, settings — split into code
+  blocks), **lawn cards** and **lawn zones** (readable mirror, one row per item
+  keyed by id; only changed rows are rewritten, removed items archived).
+  **Restore** (from the dialog) reads a snapshot and replaces cards, zones,
+  custom themes and settings through the normal validated saves, then reloads.
+  Root page = `NOTION_BACKUP_PAGE_ID`, else the page holding "lawn snapshots",
+  else the first page shared with the integration. Without `NOTION_TOKEN` the
+  dialog shows the setup steps.
 - **Saving**: autosave ~600ms after changes (tiles, zones, settings), status in nav
   (Saving…/Saved/Couldn't save). If the DB is unreachable the site shows code
   defaults read-only (so defaults can never overwrite real data).
@@ -186,9 +203,14 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   PostgREST on `:54321` and enforces RLS (runs as `anon`, sets `request.headers`
   from `x-lawn-secret`). Run the app with `SUPABASE_URL=http://localhost:54321 npx next start`.
   The scripts were session-local; recreate from this description if needed.
+- **Mock Notion**: a preload (`NODE_OPTIONS="--import mock.mjs"` on `next start`)
+  patches `fetch` for `api.notion.com` with an in-memory Notion that rejects
+  payloads real Notion would (unknown/mistyped properties, >2000-char runs,
+  >100 blocks). Used to test backup / mirror / throttle / restore.
 
 ## 9. Changelog (newest first)
 
+- 2026-10-16 backups to Notion: daily cron + "Back up now", snapshots (full JSON) + cards/zones mirror, restore from the Backups dialog; saveTheme is now an upsert
 - 2026-10-16 board: zones hidden outside edit mode; nav zone chips/"All" → Zones dropdown that pans to the zone's centre (zoom kept); Assign zone only while editing; Space+drag pans while assigning; reload centres last zone at 100%
 - 2026-10-16 board: "Assign zone" (drag a cell rectangle to create a zone); cards can no longer overlap (nearest-free drop/placement, resize stops at neighbours)
 - 2026-10-16 board mode: canvas with pan/zoom, free card placement, zones, Website/Board switch, last zone remembered (migration 000900); card code split into `cards.tsx`
@@ -209,6 +231,9 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 
 ## 10. Open items / known limits
 
+- **Backups need the owner's one-time Notion setup**: create an internal
+  integration, connect it to the "lawn backups" page, add `NOTION_TOKEN` to
+  Vercel and redeploy. Until then the Backups dialog shows those steps.
 - Migration 000800 (cleanup) not applied — harmless; needs the GitHub
   integration or a manual run.
 - Grid mode: dragging swaps cards; cards can't be dropped into empty space

@@ -1,4 +1,7 @@
 import Bento from "@/components/Bento";
+
+// Backups to Notion run inside this page's server actions and can take a while.
+export const maxDuration = 60;
 import { getSiteData } from "@/lib/site";
 
 export default async function Page() {

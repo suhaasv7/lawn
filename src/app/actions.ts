@@ -6,8 +6,10 @@
 // database directly with the public key.
 import { randomUUID } from "node:crypto";
 import { write } from "@/lib/db";
+import { runBackup } from "@/lib/backup";
+import { Snapshot, listSnapshots, notionConfigured, readSnapshot } from "@/lib/notion";
 import { KINDS, MAX_SPAN, MIN_SIZE, TONES, Tile, Zone } from "@/tiles";
-import { BASE_KEYS, FONTS, HEX, MAX_RADIUS, Settings, Theme, ThemeBase, deriveTheme } from "@/theme";
+import { BASE_KEYS, DEFAULT_SETTINGS, FONTS, HEX, MAX_RADIUS, Settings, Theme, ThemeBase, deriveTheme } from "@/theme";
 
 // Ids go into REST filters unquoted, so keep them to a safe alphabet.
 const SAFE_ID = /^[\w-]{1,64}$/;
@@ -110,13 +112,15 @@ export async function saveTheme(input: ThemeBase & { id?: string }): Promise<The
   const name = typeof input.name === "string" ? input.name.trim() : "";
   if (!name || name.length > 40 || !BASE_KEYS.every((k) => HEX.test(input[k]))) throw new Error("Invalid theme");
   const theme = deriveTheme({ ...input, name });
-  // Presets are excluded by the database policy, so editing one returns no rows.
-  const [saved] =
-    typeof input.id === "string" && SAFE_ID.test(input.id)
-      ? await write<Theme>("PATCH", `themes?id=eq.${input.id}`, theme)
-      : await write<Theme>("POST", "themes", { ...theme, id: randomUUID() });
-  if (!saved) throw new Error("Preset themes can't be edited");
-  return saved;
+  const id = typeof input.id === "string" && SAFE_ID.test(input.id) ? input.id : randomUUID();
+  // Upsert (so a restore can bring back a deleted theme). The database policy
+  // refuses writes to presets, which surfaces here as an error.
+  try {
+    const [saved] = await write<Theme>("POST", "themes?on_conflict=id", { ...theme, id }, "resolution=merge-duplicates");
+    return saved;
+  } catch {
+    throw new Error("Preset themes can't be edited");
+  }
 }
 
 export async function deleteTheme(id: string) {
@@ -139,5 +143,50 @@ export async function canEmbed(url: string): Promise<boolean> {
     return ancestors === undefined || ancestors.split(/\s+/).includes("*");
   } catch {
     return false;
+  }
+}
+
+// ── Backups (Notion). These return { ok, … } instead of throwing, because
+// production hides thrown messages from the browser.
+type Result<T> = ({ ok: true } & T) | { ok: false; error: string };
+const fail = (e: unknown) => ({ ok: false as const, error: (e as Error).message });
+
+export async function listBackups(): Promise<Result<{ connected: boolean; backups: Snapshot[] }>> {
+  if (!notionConfigured) return { ok: true, connected: false, backups: [] };
+  try {
+    return { ok: true, connected: true, backups: await listSnapshots() };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function backupNow(): Promise<Result<{ skipped: boolean }>> {
+  try {
+    const r = await runBackup("manual", 60_000);
+    return { ok: true, skipped: r.skipped };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// Replaces the site's cards, zones, custom themes and settings with a snapshot,
+// through the same validated saves the editor uses.
+export async function restoreBackup(pageId: string): Promise<Result<{ cards: number }>> {
+  try {
+    if (typeof pageId !== "string" || !/^[0-9a-f-]{32,36}$/i.test(pageId)) throw new Error("Invalid backup id");
+    const data = await readSnapshot(pageId);
+    for (const t of data.themes) {
+      await saveTheme({ id: t.id, name: t.name, bg: t.bg, surface: t.surface, fg: t.fg, muted: t.muted, accent: t.accent });
+    }
+    await saveZones(data.zones);
+    await saveTiles(
+      data.tiles.map(
+        (r) => ({ ...r.props, id: r.id, kind: r.kind, w: r.w, h: r.h, tone: r.tone, archived: r.archived, x: r.x, y: r.y }) as Tile
+      )
+    );
+    await saveSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+    return { ok: true, cards: data.tiles.length };
+  } catch (e) {
+    return fail(e);
   }
 }

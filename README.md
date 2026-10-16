@@ -31,5 +31,6 @@ Tables are public-read. Writes need the `x-lawn-secret` header (the server's
 | `SUPABASE_URL` | Project URL |
 | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` key |
 | `LAWN_WRITE_SECRET` | Server-only; its sha256 is in `private.owner` |
+| `NOTION_TOKEN` | Notion internal integration secret — enables backups (daily + "Back up now") to the "lawn backups" page |
 
 Without these the site shows the defaults from code, read-only.

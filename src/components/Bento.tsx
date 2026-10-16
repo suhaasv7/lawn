@@ -17,6 +17,7 @@ import {
   CanvasIcon,
   BrowserIcon,
   ArrowDown01Icon,
+  CloudUploadIcon,
 } from "@hugeicons/core-free-icons";
 import { GithubIcon } from "./BrandIcons";
 import Board, { BoardView, nearestFree, placeMissing, rectOf } from "./Board";
@@ -49,7 +50,18 @@ import {
   deriveTheme,
   themeVars,
 } from "@/theme";
-import { canEmbed, deleteTheme, saveSettings, saveTheme, saveTiles, saveZones } from "@/app/actions";
+import {
+  backupNow,
+  canEmbed,
+  deleteTheme,
+  listBackups,
+  restoreBackup,
+  saveSettings,
+  saveTheme,
+  saveTiles,
+  saveZones,
+} from "@/app/actions";
+import type { Snapshot } from "@/lib/notion";
 
 const TILE_IDS = TILES.map((t) => t.id);
 
@@ -280,6 +292,11 @@ function Bento({
   const swapyRef = useRef<Swapy | null>(null);
   const addDialogRef = useRef<HTMLDialogElement>(null);
   const archiveDialogRef = useRef<HTMLDialogElement>(null);
+  const backupDialogRef = useRef<HTMLDialogElement>(null);
+  // Backups dialog: null = loading; busy = a backup/restore in flight.
+  const [backups, setBackups] = useState<{ connected: boolean; list: Snapshot[] } | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupMsg, setBackupMsg] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setEntering(false), 1400);
@@ -572,6 +589,41 @@ function Bento({
     }
   };
 
+  // ── Backups (Notion)
+  const loadBackups = async () => {
+    const r = await listBackups();
+    if (r.ok) setBackups({ connected: r.connected, list: r.backups });
+    else {
+      setBackups({ connected: true, list: [] });
+      setBackupMsg(r.error);
+    }
+  };
+  const openBackups = () => {
+    backupDialogRef.current?.showModal();
+    setBackups(null);
+    setBackupMsg("");
+    loadBackups();
+  };
+  const runBackupNow = async () => {
+    setBackupBusy(true);
+    setBackupMsg("Backing up…");
+    const r = await backupNow();
+    setBackupMsg(!r.ok ? r.error : r.skipped ? "Already backed up in the last minute." : "Backed up to Notion.");
+    if (r.ok) await loadBackups();
+    setBackupBusy(false);
+  };
+  const restore = async (b: Snapshot) => {
+    if (!confirm(`Restore "${b.name}"? This replaces all cards, zones and settings on the site with that backup.`)) return;
+    setBackupBusy(true);
+    setBackupMsg("Restoring…");
+    const r = await restoreBackup(b.id);
+    if (r.ok) window.location.reload();
+    else {
+      setBackupMsg(r.error);
+      setBackupBusy(false);
+    }
+  };
+
   const saveLabel = { idle: "", saving: "Saving…", saved: "Saved", error: "Couldn't save" }[saveState];
 
   return (
@@ -672,6 +724,10 @@ function Bento({
               <HugeiconsIcon icon={ArchiveIcon} size={14} strokeWidth={1.75} />
               <span className="hidden sm:inline">Archive</span>
               {archived.length > 0 && <span className="tabular-nums text-faint">{archived.length}</span>}
+            </button>
+            <button onClick={openBackups} aria-label="Backups" title="Backups (Notion)" className={BTN}>
+              <HugeiconsIcon icon={CloudUploadIcon} size={14} strokeWidth={1.75} />
+              <span className="hidden sm:inline">Backup</span>
             </button>
             <button popoverTarget="theme-center" aria-label="Theme center" className={BTN}>
               <HugeiconsIcon icon={PaintBoardIcon} size={14} strokeWidth={1.75} />
@@ -918,6 +974,76 @@ function Bento({
                 </div>
               )}
             </div>
+          </div>
+        </dialog>
+      )}
+
+      {/* ── BACKUPS: snapshots in Notion; back up now, open, restore ── */}
+      {editable && (
+        <dialog ref={backupDialogRef} className={`add-dialog ${PANEL} m-auto w-[min(560px,calc(100vw-32px))] p-0`}>
+          <div className="flex flex-col gap-4 p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="m-0 text-base font-semibold">Backups</h2>
+              <button
+                type="button"
+                onClick={() => backupDialogRef.current?.close()}
+                aria-label="Close"
+                className="grid size-7 cursor-pointer place-items-center rounded-theme text-muted transition-colors hover:bg-fg/10 hover:text-fg"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />
+              </button>
+            </div>
+            {backups === null ? (
+              <p className="m-0 text-sm text-muted">Checking Notion…</p>
+            ) : !backups.connected ? (
+              <div className="flex flex-col gap-2 text-sm text-muted">
+                <p className="m-0">Notion isn&apos;t connected yet. To turn on backups:</p>
+                <ol className="m-0 flex list-decimal flex-col gap-1 pl-5">
+                  <li>Create an internal integration at notion.so/profile/integrations and copy its secret.</li>
+                  <li>Open the &quot;lawn backups&quot; page in Notion → ••• → Connections → add the integration.</li>
+                  <li>Add the secret to Vercel as NOTION_TOKEN and redeploy.</li>
+                </ol>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="m-0 text-xs text-faint">Backs up daily at about 02:00 IST, plus whenever you press the button.</p>
+                  <button onClick={runBackupNow} disabled={backupBusy} className={BTN_PRIMARY}>
+                    <HugeiconsIcon icon={CloudUploadIcon} size={14} strokeWidth={1.75} />
+                    Back up now
+                  </button>
+                </div>
+                {backups.list.length === 0 ? (
+                  <p className="m-0 text-sm text-muted">No backups yet.</p>
+                ) : (
+                  <ul className="m-0 flex max-h-[50dvh] list-none flex-col gap-2 overflow-y-auto p-0">
+                    {backups.list.map((b) => (
+                      <li key={b.id} className="flex items-center gap-3 rounded-theme border border-line px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm text-fg">
+                            {b.taken ? new Date(b.taken).toLocaleString() : b.name}
+                          </div>
+                          <div className="text-[11px] text-faint">
+                            {b.trigger} · {b.cards} cards
+                          </div>
+                        </div>
+                        <a href={b.url} target="_blank" rel="noreferrer" className={`${BTN} no-underline`}>
+                          Open
+                        </a>
+                        <button onClick={() => restore(b)} disabled={backupBusy} className={BTN}>
+                          Restore
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+            {backupMsg && (
+              <p aria-live="polite" className="m-0 text-xs text-muted">
+                {backupMsg}
+              </p>
+            )}
           </div>
         </dialog>
       )}
