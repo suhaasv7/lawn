@@ -49,7 +49,7 @@ lookbook app) lives next to it and appears as a website card.
 | Hosting | Vercel project `lawn` (`prj_01P4dfH5AW43IraB1tPlC5KLjhke`), team `suhaasvijay's projects` (`team_SEmue22W9j5MV05WZVzVukq4`). `vercel.json` pins `framework: nextjs` (project was created as Vite) and `regions: ["hnd1"]` (Tokyo, next to the DB). Domain `lawn.sv7.space` via Cloudflare → Vercel. |
 | Database | Supabase project **"Lawn"**, ref `rqdkxgtoccuvuxqkyxzf`, region ap-northeast-1 (Tokyo), Postgres 17. Accessed server-side only over REST with plain `fetch` (no supabase-js). |
 | Env vars (Vercel + `.env.local`) | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (`sb_publishable_…`), `LAWN_WRITE_SECRET` (server-only; sha256 stored in `private.owner`). Backups: `NOTION_TOKEN` (Notion internal integration secret, `ntn_…`) — optional `NOTION_BACKUP_PAGE_ID`, optional `CRON_SECRET`. `OWNER_PASSPHRASE` and `VITE_GOOGLE_CLIENT_ID` are obsolete and can be deleted from Vercel. |
-| Notion | Backup destination. Private page **"lawn backups"** (id `3fb92f02-8cea-814f-94d5-c72404bc73bb`) created 2026-10-16 via the Notion MCP. The site's integration must be connected to it (••• → Connections). Notion MCP is also connected for Claude at local scope. |
+| Notion | Backup destination: a page in the owner's Notion workspace (the one the `NOTION_TOKEN` connection belongs to), connected to the integration. Note: the Notion MCP available to Claude is connected to a **different workspace** — a "lawn backups" page created there via MCP (id `3fb92f02…`) is NOT the backup page and can be deleted. |
 | MCP | Supabase MCP added at local scope for `~/Documents/personal` (read-only calls work; destructive SQL is auto-declined — §5). Vercel MCP returns 403 for this team's project/env endpoints (needs re-auth to that scope); there's no Vercel CLI. |
 | Fonts | next/font: Cascadia Code (default, preloaded), JetBrains Mono, Geist Mono, Geist, Inter (not preloaded). |
 
@@ -171,9 +171,10 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   keyed by id; only changed rows are rewritten, removed items archived).
   **Restore** (from the dialog) reads a snapshot and replaces cards, zones,
   custom themes and settings through the normal validated saves, then reloads.
-  Root page = `NOTION_BACKUP_PAGE_ID`, else the page holding "lawn snapshots",
-  else the first page shared with the integration. Without `NOTION_TOKEN` the
-  dialog shows the setup steps.
+  Root page = `NOTION_BACKUP_PAGE_ID`, else the first page shared with the
+  integration (search; can lag a minute after sharing). The three databases are
+  found by listing the root page's children (no search lag). Without
+  `NOTION_TOKEN` the dialog shows the setup steps.
 - **Saving**: autosave ~600ms after changes (tiles, zones, settings), status in nav
   (Saving…/Saved/Couldn't save). If the DB is unreachable the site shows code
   defaults read-only (so defaults can never overwrite real data).

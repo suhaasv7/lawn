@@ -55,6 +55,9 @@ async function notion<T>(path: string, method = "GET", body?: unknown): Promise<
       continue;
     }
     const data = await res.json().catch(() => ({}));
+    if (res.status === 404) {
+      throw new Error("Notion can't see the backups page: open it → ••• → Connections → add your integration (or check NOTION_BACKUP_PAGE_ID).");
+    }
     if (!res.ok) throw new Error(`Notion ${res.status}: ${data.message ?? res.statusText}`);
     return data as T;
   }
@@ -100,23 +103,30 @@ const SCHEMAS = {
   },
 };
 
-// The three databases, created under the backup page on first use. The page is
-// NOTION_BACKUP_PAGE_ID if set; otherwise the one holding "lawn snapshots";
-// otherwise the (first) page shared with the integration.
-async function databases(): Promise<Dbs> {
-  type DbObj = { id: string; title: RichText; parent: { type: string; page_id?: string } };
-  const found = await notion<Paged<DbObj>>("search", "POST", { filter: { property: "object", value: "database" }, page_size: 100 });
-  const named = (t: string) => found.results.filter((d) => plain(d.title) === t);
-  let root = process.env.NOTION_BACKUP_PAGE_ID ?? named("lawn snapshots")[0]?.parent.page_id;
-  if (!root) {
-    type P = { id: string; parent: { type: string } };
-    const pages = await notion<Paged<P>>("search", "POST", { filter: { property: "object", value: "page" }, page_size: 100 });
-    root = pages.results.find((p) => p.parent.type !== "database_id")?.id;
-    if (!root) throw new Error("Notion: no page is shared with the integration yet (add it under ••• → Connections).");
+// The page backups live under: NOTION_BACKUP_PAGE_ID, or else the page shared
+// with the integration (via search, which can lag a minute after sharing).
+async function backupPage(): Promise<string> {
+  if (process.env.NOTION_BACKUP_PAGE_ID) return process.env.NOTION_BACKUP_PAGE_ID;
+  type P = { id: string; parent: { type: string } };
+  const r = await notion<Paged<P>>("search", "POST", { filter: { property: "object", value: "page" }, page_size: 100 });
+  const page = r.results.find((p) => p.parent.type !== "database_id");
+  if (!page) {
+    throw new Error("Notion: no page is shared with the integration yet — open your backups page → ••• → Connections → add it (can take a minute to show up).");
   }
-  const norm = (id?: string) => id?.replace(/-/g, "");
+  return page.id;
+}
+
+// The three databases, created under the backup page on first use. Found by
+// listing the page's children (immediate — search lags behind new content).
+async function databases(): Promise<Dbs> {
+  type Block = { id: string; type: string; child_database?: { title: string } };
+  const root = await backupPage();
+  const kids = await every((c) =>
+    notion<Paged<Block>>(`blocks/${root}/children?page_size=100${c ? `&start_cursor=${c}` : ""}`)
+  );
+  const existing = new Map(kids.filter((k) => k.type === "child_database").map((k) => [k.child_database!.title, k.id]));
   const ensure = async (title: keyof typeof SCHEMAS) =>
-    named(title).find((d) => norm(d.parent.page_id) === norm(root))?.id ??
+    existing.get(title) ??
     (
       await notion<{ id: string }>("databases", "POST", {
         parent: { type: "page_id", page_id: root },
