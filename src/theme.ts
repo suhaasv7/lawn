@@ -29,7 +29,14 @@ export const COLOR_KEYS = [
 type ColorKey = (typeof COLOR_KEYS)[number];
 
 export type Theme = { id: string; name: string; is_preset: boolean } & Record<ColorKey, string>;
-export type Settings = { theme_id: string | null; font: string; radius: number };
+// mode: grid ("website") or free-form board; zone_id: last zone viewed on the board.
+export type Settings = {
+  theme_id: string | null;
+  font: string;
+  radius: number;
+  mode: "website" | "board";
+  zone_id: string | null;
+};
 
 // The colors you pick in Theme Center; the rest are derived from these.
 export const BASE_KEYS = ["bg", "surface", "fg", "muted", "accent"] as const;
@@ -61,7 +68,8 @@ export const DEFAULT_THEME: Theme = {
   glow_2: "rgb(59 130 246 / 0.12)",
 };
 
-export const DEFAULT_SETTINGS: Settings = { theme_id: "midnight", font: "cascadia", radius: 0 };
+export const DEFAULT_LOOK = { theme_id: "midnight", font: "cascadia", radius: 0 } as const;
+export const DEFAULT_SETTINGS: Settings = { ...DEFAULT_LOOK, mode: "website", zone_id: null };
 
 export function deriveTheme(b: ThemeBase): Omit<Theme, "id" | "is_preset"> {
   return {

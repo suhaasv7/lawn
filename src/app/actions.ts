@@ -6,11 +6,14 @@
 // database directly with the public key.
 import { randomUUID } from "node:crypto";
 import { write } from "@/lib/db";
-import { KINDS, MAX_SPAN, MIN_SIZE, TONES, Tile } from "@/tiles";
+import { KINDS, MAX_SPAN, MIN_SIZE, TONES, Tile, Zone } from "@/tiles";
 import { BASE_KEYS, FONTS, HEX, MAX_RADIUS, Settings, Theme, ThemeBase, deriveTheme } from "@/theme";
 
 // Ids go into REST filters unquoted, so keep them to a safe alphabet.
 const SAFE_ID = /^[\w-]{1,64}$/;
+
+// Board coordinates (cells): optional on tiles, required on zones.
+const isCoord = (v: unknown) => Number.isInteger(v) && Math.abs(v as number) <= 10000;
 
 const isHttpUrl = (u: unknown) => {
   try {
@@ -25,7 +28,7 @@ export async function saveTiles(tiles: Tile[]) {
   const seen = new Set<string>();
   const now = new Date().toISOString();
   const rows = tiles.map((t, position) => {
-    const { id, kind, w, h, tone, archived, ...props } = t;
+    const { id, kind, w, h, tone, archived, x, y, ...props } = t;
     const ok =
       typeof id === "string" &&
       SAFE_ID.test(id) &&
@@ -39,10 +42,12 @@ export async function saveTiles(tiles: Tile[]) {
       h >= MIN_SIZE[kind][1] &&
       h <= MAX_SPAN &&
       ((kind !== "bookmark" && kind !== "website") || isHttpUrl((t as { url?: unknown }).url)) &&
+      (x == null || isCoord(x)) &&
+      (y == null || isCoord(y)) &&
       JSON.stringify(props).length <= 10000;
     if (!ok) throw new Error(`Invalid tile: ${String(id)}`);
     seen.add(id);
-    return { id, kind, position, w, h, tone, archived: archived === true, props, updated_at: now };
+    return { id, kind, position, w, h, tone, archived: archived === true, x: x ?? null, y: y ?? null, props, updated_at: now };
   });
   // Upsert first, then drop removed tiles, so a failure never loses a tile.
   if (rows.length) await write("POST", "tiles?on_conflict=id", rows, "resolution=merge-duplicates");
@@ -51,6 +56,8 @@ export async function saveTiles(tiles: Tile[]) {
 
 export async function saveSettings(s: Settings) {
   const ok =
+    (s.mode === "website" || s.mode === "board") &&
+    (s.zone_id === null || (typeof s.zone_id === "string" && SAFE_ID.test(s.zone_id))) &&
     (s.theme_id === null || (typeof s.theme_id === "string" && SAFE_ID.test(s.theme_id))) &&
     FONTS.some((f) => f.id === s.font) &&
     Number.isInteger(s.radius) &&
@@ -61,9 +68,40 @@ export async function saveSettings(s: Settings) {
     theme_id: s.theme_id,
     font: s.font,
     radius: s.radius,
+    mode: s.mode,
+    zone_id: s.zone_id,
     updated_at: new Date().toISOString(),
   });
   if (!saved.length) throw new Error("Settings weren't saved");
+}
+
+// Same pattern as tiles: upsert what's there, then drop removed zones.
+export async function saveZones(zones: Zone[]) {
+  if (!Array.isArray(zones) || zones.length > 100) throw new Error("Invalid zones");
+  const seen = new Set<string>();
+  const rows = zones.map((z, position) => {
+    const ok =
+      typeof z.id === "string" &&
+      SAFE_ID.test(z.id) &&
+      !seen.has(z.id) &&
+      typeof z.name === "string" &&
+      z.name.trim().length >= 1 &&
+      z.name.length <= 40 &&
+      isCoord(z.x) &&
+      isCoord(z.y) &&
+      Number.isInteger(z.w) &&
+      z.w >= 2 &&
+      z.w <= 400 &&
+      Number.isInteger(z.h) &&
+      z.h >= 2 &&
+      z.h <= 400 &&
+      TONES.includes(z.tone);
+    if (!ok) throw new Error(`Invalid zone: ${String(z.id)}`);
+    seen.add(z.id);
+    return { id: z.id, name: z.name.trim(), x: z.x, y: z.y, w: z.w, h: z.h, tone: z.tone, position };
+  });
+  if (rows.length) await write("POST", "zones?on_conflict=id", rows, "resolution=merge-duplicates");
+  await write("DELETE", rows.length ? `zones?id=not.in.(${rows.map((r) => r.id).join(",")})` : "zones?id=not.is.null");
 }
 
 // Only the five base colors come from the browser (hex only); the rest are

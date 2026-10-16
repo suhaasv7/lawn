@@ -1,13 +1,13 @@
 import { cache } from "react";
-import { TILES, Tile } from "@/tiles";
+import { TILES, Tile, Zone } from "@/tiles";
 import { DEFAULT_SETTINGS, DEFAULT_THEME, Settings, Theme } from "@/theme";
 import { dbConfigured, select } from "./db";
 
-export type SiteData = { tiles: Tile[]; themes: Theme[]; settings: Settings; live: boolean };
+export type SiteData = { tiles: Tile[]; zones: Zone[]; themes: Theme[]; settings: Settings; live: boolean };
 
-type TileRow = Pick<Tile, "id" | "kind" | "w" | "h" | "tone" | "archived"> & { props: Record<string, unknown> };
+type TileRow = Pick<Tile, "id" | "kind" | "w" | "h" | "tone" | "archived" | "x" | "y"> & { props: Record<string, unknown> };
 
-const FALLBACK: SiteData = { tiles: TILES, themes: [DEFAULT_THEME], settings: DEFAULT_SETTINGS, live: false };
+const FALLBACK: SiteData = { tiles: TILES, zones: [], themes: [DEFAULT_THEME], settings: DEFAULT_SETTINGS, live: false };
 
 // Read once per request (shared by layout and page). If Supabase isn't set up
 // or fails, serve the defaults from code with live=false, which also hides the
@@ -15,18 +15,20 @@ const FALLBACK: SiteData = { tiles: TILES, themes: [DEFAULT_THEME], settings: DE
 export const getSiteData = cache(async (): Promise<SiteData> => {
   if (!dbConfigured) return FALLBACK;
   try {
-    const [rows, themes, settings] = await Promise.all([
-      select<TileRow>("tiles", "select=id,kind,w,h,tone,archived,props&order=position"),
+    const [rows, zones, themes, settings] = await Promise.all([
+      select<TileRow>("tiles", "select=id,kind,w,h,tone,archived,x,y,props&order=position"),
+      select<Zone>("zones", "select=id,name,x,y,w,h,tone,position&order=position"),
       select<Theme>(
         "themes",
         "select=id,name,is_preset,bg,surface,raised,line,line_strong,fg,muted,faint,accent,glow_1,glow_2&order=is_preset.desc,created_at,name"
       ),
-      select<Settings>("site_settings", "select=theme_id,font,radius&id=eq.1"),
+      select<Settings>("site_settings", "select=theme_id,font,radius,mode,zone_id&id=eq.1"),
     ]);
     return {
       tiles: rows.map(({ props, ...row }) => ({ ...props, ...row }) as Tile),
+      zones,
       themes: themes.length ? themes : [DEFAULT_THEME],
-      settings: settings[0] ?? DEFAULT_SETTINGS,
+      settings: { ...DEFAULT_SETTINGS, ...settings[0] },
       live: true,
     };
   } catch (e) {

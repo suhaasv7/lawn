@@ -28,7 +28,8 @@ export const MIN_SIZE: Record<Kind, [number, number]> = {
 export const ADD_SIZE = { bookmark: [1, 1], website: [4, 4], note: [4, 3], todo: [4, 4] } as const;
 
 // archived: hidden from the grid, listed in the archive view.
-type Base = { id: string; tone: Tone; w: number; h: number; archived?: boolean };
+// x, y: position on the board (cells); unset until first placed there.
+type Base = { id: string; tone: Tone; w: number; h: number; archived?: boolean; x?: number | null; y?: number | null };
 // embed: whether the site allows being shown in an iframe (checked when added;
 // false falls back to a screenshot). image: optional custom preview.
 // view: website preview at desktop width (default) or the site's mobile layout.
@@ -52,6 +53,9 @@ export type Tile =
   | (Base & { kind: "todo"; label: string; items: { text: string; done: boolean }[] })
   | (Base & { kind: "list"; label: string; items: string[] })
   | (Base & { kind: "clock"; label: string; timeZone: string });
+
+// A named area of the board (cells). Cards fully inside it move with it.
+export type Zone = { id: string; name: string; x: number; y: number; w: number; h: number; tone: Tone; position: number };
 
 export const SITE_NAME = "suhaas";
 

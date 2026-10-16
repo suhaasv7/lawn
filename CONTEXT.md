@@ -63,25 +63,28 @@ src/lib/db.ts           REST helpers: select(), write() (adds x-lawn-secret head
 src/lib/site.ts         getSiteData(): tiles/themes/settings per request; falls back to code defaults (read-only) if DB fails
 src/tiles.ts            tile kinds, tones, MIN_SIZE / ADD_SIZE, Tile type, default TILES (fallback + "Reset")
 src/theme.ts            Theme/Settings types, FONTS, DEFAULT_THEME/SETTINGS, deriveTheme (5 base colours → full palette), themeVars
-src/components/Bento.tsx  the app shell: nav, grid (Swapy), Add / Archive / Theme Center dialogs, autosave
+src/components/Bento.tsx  the app shell: nav (mode switch, zone bar), grid (Swapy), Add / Archive / Theme Center dialogs, autosave
+src/components/cards.tsx  every card kind (TileCard, WebsiteTile, TodoTile…), TileControls (edit overlay), shared class sets/helpers
+src/components/Board.tsx  board mode: camera (pan/zoom/pinch), free card drag/resize, zones, placeMissing()
 src/components/BrandIcons.tsx  GithubIcon
 supabase/migrations/    SQL history (see §5)
 supabase/config.toml    from `supabase init` (for the GitHub integration, which isn't enabled)
 ```
-(Board mode work in progress adds `src/components/cards.tsx` and `src/components/Board.tsx` — §11.)
 
 ## 5. Data model (Supabase)
 
 **Tables (public schema, RLS on):**
-- `tiles` — `id text pk, kind text, position int, w int (1–24), h int (1–24), tone text, archived bool, props jsonb, created_at, updated_at`.
+- `tiles` — `id text pk, kind text, position int, w int (1–24), h int (1–24), tone text, archived bool, x int, y int, props jsonb, created_at, updated_at`.
+  `position` = order in the grid; `x, y` = cell position on the board (null until first placed).
+- `zones` — `id, name, x, y, w, h (cells, 2–400), tone, position, created_at` (board areas).
   Kind/tone are **validated in the app, not the DB** (since 000700), so new tile
   types need no schema change. Kind-specific fields live in `props`.
 - `themes` — `id, name, is_preset, bg, surface, raised, line, line_strong, fg, muted, faint, accent, glow_1, glow_2, created_at`. 6 presets (midnight, carbon, terminal, abyss, ember, rose) are read-only.
-- `site_settings` — single row `id=1`: `theme_id, font, radius, updated_at`.
+- `site_settings` — single row `id=1`: `theme_id, font, radius, mode ('website'|'board'), zone_id (last zone; plain text, no FK), updated_at`.
 - `private.owner` — `secret_sha256` (hash of `LAWN_WRITE_SECRET`).
 - Retired, still present: `tiles_legacy`, `tiles_legacy_kinds` (dropped by pending 000800).
 
-**Access:** policy "Public read" (select) on all three; policy "Owner writes"
+**Access:** policy "Public read" (select) on tiles/zones/themes/site_settings; policy "Owner writes"
 (`for all`) using `public.lawn_is_owner()`, which checks the request's
 `x-lawn-secret` header (`current_setting('request.headers')`) against
 `private.owner`. Presets are excluded from writes. The publishable key alone is
@@ -98,6 +101,7 @@ read-only; all writes go through `src/app/actions.ts` (server) with the secret.
 | 000500 lawn_owner_writes | `lawn_is_owner()` + "Owner writes" policies | yes |
 | 000700 tiles_archive_open_kinds | rebuild `tiles`: + `archived`, no kind/tone checks | yes |
 | 000800 drop_legacy | drop retired tables + old trading-template function/trigger | **no** (destructive) |
+| 000900 board_mode | tiles.x/y, zones table + policies, site_settings.mode/zone_id | yes |
 
 **Connector limitation (important):** in this environment the Supabase MCP
 auto-declines anything destructive (`drop`, `update`/`delete` — even inside
@@ -136,7 +140,17 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   derived server-side, live preview), font (5), corner radius 0–28px.
   Everything visual uses Tailwind tokens (`bg-surface`, `text-muted`,
   `border-line`, `rounded-theme`, …) backed by `--t-*` variables.
-- **Saving**: autosave ~600ms after changes (tiles, settings), status in nav
+- **Board mode** (Website/Board switch in the nav; mode is saved): the whole site
+  is one canvas. Scroll/drag empty space to pan; pinch or ctrl+scroll to zoom
+  (free, 10%–250%). Cards keep their own board position (`x, y`), separate from
+  the grid order; cards never placed get auto-placed first-fit in a 24-cell band.
+  Edit mode: drag cards anywhere (dashed outline shows the snap target), resize,
+  faint cell outlines. **Zones**: named dashed areas; "+ Zone" (edit mode) adds
+  one mid-view; drag a zone by its label (cards fully inside move with it),
+  resize from its corner, rename inline, delete (cards stay). Zone chips + "All"
+  in the nav fly the camera to fit; the last zone (and mode) is saved and the
+  board reopens there. Cards can overlap on the board (no collision rules yet).
+- **Saving**: autosave ~600ms after changes (tiles, zones, settings), status in nav
   (Saving…/Saved/Couldn't save). If the DB is unreachable the site shows code
   defaults read-only (so defaults can never overwrite real data).
 
@@ -168,6 +182,8 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 
 ## 9. Changelog (newest first)
 
+- 2026-10-16 board mode: canvas with pan/zoom, free card placement, zones, Website/Board switch, last zone remembered (migration 000900); card code split into `cards.tsx`
+- `bb2adfa` CONTEXT.md + CLAUDE.md added
 - 2026-10-16 `7942c10` edit-mode cells → faint outlines
 - `cf1e293` website previews only scroll in interact mode; saved scroll removed
 - `fbda9c2` interact mode gets a real window; edit-mode cell grid; archive modal shows real cards
@@ -187,28 +203,14 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 - Migration 000800 (cleanup) not applied — harmless; needs the GitHub
   integration or a manual run.
 - Grid mode: dragging swaps cards; cards can't be dropped into empty space
-  (board mode solves this).
+  (board mode allows free placement).
+- Board: cards can overlap; zones have a single tone (accent) — no colour picker yet.
 - Anyone who opens the site can edit (by design — single user, no login).
 - Website previews of sites that block framing (GitHub, Vercel…) fall back to a
   screenshot (microlink free tier, ~50/day per IP).
 
-## 11. In progress: Board mode (whiteboard)
+## 11. In progress
 
-Owner's decisions (2026-10-16):
-1. The **whole site becomes a board**, with a switch back to the current grid ("website mode").
-2. **Free zoom** (wheel/pinch) and pan.
-3. No visitors — **remember the last zone** (and mode) and open there.
-
-Plan:
-- Cards get `x, y` (cells) and can be dropped anywhere, snapped to the 56px grid
-  (68px pitch). Cards without a position are auto-placed first-fit.
-- **Zones** = named rectangles (`zones` table: id, name, x, y, w, h, tone,
-  position). Cards inside a zone move with it. Zone chips in the top bar fly the
-  camera to fit that zone.
-- `site_settings` gains `mode` ('website' | 'board') and `zone_id` (last zone).
-- Additive migration (connector-safe): `alter table … add column` + `create table zones` + policies.
-- Code: split card rendering into `src/components/cards.tsx`; new
-  `src/components/Board.tsx` (camera transform, pan/zoom/pinch, free drag,
-  zones); `Bento.tsx` switches between grid and board.
-
-Status: started — plan above; nothing shipped yet.
+Nothing in progress. Board mode shipped (see §6) per the owner's decisions:
+whole site as a board with a switch back to website mode, free zoom, and it
+reopens on the last zone (single user, no visitors).

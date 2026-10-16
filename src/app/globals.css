@@ -236,6 +236,16 @@ body::before {
   transform: translateY(-2px);
 }
 
+/* Board edit mode: the same faint cell outlines, sized/positioned by the
+   camera (inline mask-size / mask-position). */
+.board-cells {
+  background: color-mix(in oklab, var(--t-fg) 9%, transparent);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='68' height='68'%3E%3Crect x='.5' y='.5' width='55' height='55' fill='none' stroke='black'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='68' height='68'%3E%3Crect x='.5' y='.5' width='55' height='55' fill='none' stroke='black'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
+
 /* First paint only: tiles rise in, staggered by slot index (--i) */
 .entering .tile {
   animation: var(--animate-rise);
