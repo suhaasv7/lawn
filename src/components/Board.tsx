@@ -7,7 +7,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowExpandDiagonal01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
-import { MAX_SPAN, MIN_SIZE, Tile, Zone, inZone } from "@/tiles";
+import { MAX_SPAN, MIN_SIZE, Tile, Zone } from "@/tiles";
 import { CTL_BTN, SECTION, TONE, TileCard, TileControls } from "./cards";
 
 export const PITCH = 68; // 56px cell + 12px gap
@@ -22,6 +22,7 @@ export type BoardView = { center: () => { x: number; y: number } };
 
 const span = (cells: number) => cells * PITCH - GAP;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const inside = (t: Rect, z: Rect) => t.x >= z.x && t.y >= z.y && t.x + t.w <= z.x + z.w && t.y + t.h <= z.y + z.h;
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 export const rectOf = (t: Tile): Rect => ({ x: t.x ?? 0, y: t.y ?? 0, w: t.w, h: t.h });
 
@@ -367,7 +368,7 @@ export default function Board({
   // Edit mode: drag a zone by its label (its cards come along) or resize it.
   const startZoneDrag = (e: React.PointerEvent, z: Zone) => {
     if (!editing || drawing || e.button !== 0 || (e.target as HTMLElement).closest("input, button")) return;
-    const ids = tiles.filter((t) => inZone(t, z)).map((t) => t.id);
+    const ids = tiles.filter((t) => inside({ x: t.x ?? 0, y: t.y ?? 0, w: t.w, h: t.h }, z)).map((t) => t.id);
     track(
       e,
       (dx, dy) => setDrag({ ids, zoneId: z.id, dx, dy }),

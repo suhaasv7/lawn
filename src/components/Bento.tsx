@@ -33,7 +33,7 @@ import {
   host,
   labelOf,
 } from "./cards";
-import { ADD_SIZE, MAX_SPAN, MIN_SIZE, TILES, SITE_NAME, Tile, Zone, inZone } from "@/tiles";
+import { ADD_SIZE, MAX_SPAN, MIN_SIZE, TILES, SITE_NAME, Tile, Zone, zoneOf } from "@/tiles";
 import {
   BASE_KEYS,
   BASE_LABELS,
@@ -285,10 +285,10 @@ function Bento({
   const board = editable && settings.mode === "board";
   const [flyNonce, setFlyNonce] = useState(0);
   // Zones are one thing, two views: the board pans to the picked zone, website
-  // mode shows only that zone's cards (centre inside it). No zones = all cards.
+  // mode shows only that zone's cards (those nearest it). No zones = all cards.
   const zone = zones.find((z) => z.id === settings.zone_id) ?? zones[0];
   const gridZone = board ? undefined : zone;
-  const inGrid = (t: Tile) => !t.archived && (!gridZone || inZone(t, gridZone));
+  const inGrid = (t: Tile) => !t.archived && (!gridZone || zoneOf(t, zones) === gridZone);
   const gridTiles = tiles.filter(inGrid);
   // Swapy's handler is created once per layout, so it reads the filter from here.
   const inGridRef = useRef(inGrid);
@@ -473,13 +473,6 @@ function Bento({
       : gridZone && { x: gridZone.x + gridZone.w / 2, y: gridZone.y + gridZone.h / 2 };
     if (!c) return {};
     const to = nearestFree({ x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h }, visible.map(rectOf));
-    // A full zone grows to take the card, so it still shows in the zone it was added to.
-    if (gridZone && !inZone(to, gridZone)) {
-      const x = Math.min(gridZone.x, to.x);
-      const y = Math.min(gridZone.y, to.y);
-      const grown = { x, y, w: Math.max(gridZone.x + gridZone.w, to.x + w) - x, h: Math.max(gridZone.y + gridZone.h, to.y + h) - y };
-      setZones((zs) => zs.map((z) => (z.id === gridZone.id ? { ...z, ...grown } : z)));
-    }
     return { x: to.x, y: to.y };
   };
 

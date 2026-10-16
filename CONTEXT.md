@@ -160,15 +160,18 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   "Zone N" with its name focused. Still in edit mode you can drag a zone by its
   label (cards fully inside move with it), resize from its corner, rename,
   delete (cards stay). **Nav**: a custom Zones dropdown (`ZonePicker`, shown
-  in both modes once zones exist). A card belongs to a zone when its centre is
-  inside it (`inZone` in `tiles.ts`, used by board, website view and Notion).
+  in both modes once zones exist). A card belongs to its **nearest** zone (distance
+  from the card's centre to the zone rect, inside = 0; `zoneOf` in `tiles.ts`,
+  used by the website view and Notion). Owner's zones are 2×2 markers that cards
+  sit around, so "inside" alone would match nothing. Dragging a zone on the
+  board still only carries cards fully inside it.
   Zones are one thing with two views (owner: "just the view is different"):
   the dropdown lists **only zones** (no "All"), and the picked zone
   (`settings.zone_id`, else the first zone) is shared by both modes. Board:
   pans so the zone's centre is mid-screen, keeping the current zoom. Website:
   the grid shows only that zone's cards (swap/resize work; a card added there
-  lands in the zone, which grows if full). Cards outside every zone show only
-  on the board. No zones at all = website shows every card. The board reopens
+  lands near the zone's centre). Every placed card belongs to some zone. No
+  zones at all = website shows every card. The board reopens
   centred on the last zone at 100%.
 - **Backups → Notion** ("Backup" button in the nav opens the Backups dialog):
   daily via Vercel Cron (`/api/backup`, skipped if the last snapshot is <12h
@@ -220,6 +223,7 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 
 ## 9. Changelog (newest first)
 
+- 2026-10-16 zone membership = nearest zone (zones are small markers), so window mode shows the same cards as the board around that zone; dropped zone auto-grow
 - 2026-10-16 zones = one selection, two views: dropdown lists only zones; website mode shows only the picked zone's cards (defaults to the first zone); removed the "All cards"/"Whole board" entries
 - 2026-10-16 zones viewable in both modes: website mode filters the grid to a zone; fixed Swapy crash when swapping a website card (iframe now always rendered)
 - 2026-10-16 custom themed Zones dropdown (replaces native select), also shown in website mode (picking a zone opens the board there)
