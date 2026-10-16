@@ -16,7 +16,7 @@ import {
   PaintBoardIcon,
   CanvasIcon,
   BrowserIcon,
-  FitToScreenIcon,
+  ArrowDown01Icon,
 } from "@hugeicons/core-free-icons";
 import { GithubIcon } from "./BrandIcons";
 import Board, { BoardView, nearestFree, placeMissing, rectOf } from "./Board";
@@ -587,30 +587,45 @@ function Bento({
         </a>
 
         {board && (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [scrollbar-width:none]">
-            <button
-              onClick={() => selectZone(null)}
-              aria-pressed={!settings.zone_id}
-              title="Fit everything"
-              className={BTN}
-            >
-              <HugeiconsIcon icon={FitToScreenIcon} size={14} strokeWidth={1.75} />
-              <span className="hidden sm:inline">All</span>
-            </button>
-            {zones.map((z) => (
-              <button key={z.id} onClick={() => selectZone(z.id)} aria-pressed={settings.zone_id === z.id} className={BTN}>
-                {z.name}
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            {zones.length > 0 && (
+              // Always shows the current zone; picking any zone (even the same
+              // one) pans there, because the select's real value stays "".
+              <label className="relative flex items-center">
+                <span className="sr-only">Go to zone</span>
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && selectZone(e.target.value)}
+                  className={`${BTN} max-w-[40vw] appearance-none truncate pr-8`}
+                >
+                  <option value="" hidden>
+                    {zones.find((z) => z.id === settings.zone_id)?.name ?? "Zones"}
+                  </option>
+                  {zones.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.name}
+                    </option>
+                  ))}
+                </select>
+                <HugeiconsIcon
+                  icon={ArrowDown01Icon}
+                  size={13}
+                  strokeWidth={1.75}
+                  className="pointer-events-none absolute right-2.5 text-muted"
+                />
+              </label>
+            )}
+            {editing && (
+              <button
+                onClick={() => setDrawingZone((v) => !v)}
+                aria-pressed={drawingZone}
+                title="Assign a zone: drag across the grid to mark it"
+                className={`${BTN} border-dashed`}
+              >
+                <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.75} />
+                Assign zone
               </button>
-            ))}
-            <button
-              onClick={() => setDrawingZone((v) => !v)}
-              aria-pressed={drawingZone}
-              title="Assign a zone: drag across the grid to mark it"
-              className={`${BTN} border-dashed`}
-            >
-              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.75} />
-              Assign zone
-            </button>
+            )}
           </div>
         )}
 
@@ -663,7 +678,10 @@ function Bento({
               <span className="hidden sm:inline">Theme</span>
             </button>
             <button
-              onClick={() => setIsEditing((v) => !v)}
+              onClick={() => {
+                setIsEditing((v) => !v);
+                setDrawingZone(false);
+              }}
               aria-pressed={editing}
               title={editing ? "Finish editing" : "Move and resize tiles"}
               className={BTN}
@@ -697,7 +715,7 @@ function Bento({
           tiles={visible}
           zones={zones}
           editing={editing}
-          drawing={drawingZone}
+          drawing={drawingZone && editing}
           focusZoneId={focusZoneId}
           activeZoneId={settings.zone_id}
           flyNonce={flyNonce}

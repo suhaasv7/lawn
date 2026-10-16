@@ -148,12 +148,15 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   resize, faint cell outlines. **Cards never overlap**: a drop lands on the
   nearest free spot (`nearestFree`, ring search), resizing (drag or arrow keys)
   stops at the first card in the way, and new / restored / zone-moved cards are
-  placed on the nearest free spot. **Zones**: "Assign zone" (always in board
-  mode) shows the cells and you drag a rectangle (≥2×2, live W×H label; Esc
-  cancels); it becomes "Zone N", edit mode turns on and its name is focused.
-  Drag a zone by its label (cards fully inside move with it), resize from its
-  corner, rename inline, delete (cards stay). Zone chips + "All" in the nav fly
-  the camera to fit; the last zone (and mode) is saved and the board reopens there.
+  placed on the nearest free spot. **Zones** are invisible outside edit mode
+  (no outline, no label). In edit mode: "Assign zone" (only shown while
+  editing) shows the cells; drag a rectangle (≥2×2, live W×H label) — scroll or
+  hold Space+drag to move around while assigning, Esc cancels; it becomes
+  "Zone N" with its name focused. Still in edit mode you can drag a zone by its
+  label (cards fully inside move with it), resize from its corner, rename,
+  delete (cards stay). **Nav**: a Zones dropdown (only zone names, no "All");
+  picking one pans so the zone's centre is mid-screen, keeping the current
+  zoom. The last zone (and mode) is saved; the board reopens centred on it at 100%.
 - **Saving**: autosave ~600ms after changes (tiles, zones, settings), status in nav
   (Saving…/Saved/Couldn't save). If the DB is unreachable the site shows code
   defaults read-only (so defaults can never overwrite real data).
@@ -186,6 +189,7 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 
 ## 9. Changelog (newest first)
 
+- 2026-10-16 board: zones hidden outside edit mode; nav zone chips/"All" → Zones dropdown that pans to the zone's centre (zoom kept); Assign zone only while editing; Space+drag pans while assigning; reload centres last zone at 100%
 - 2026-10-16 board: "Assign zone" (drag a cell rectangle to create a zone); cards can no longer overlap (nearest-free drop/placement, resize stops at neighbours)
 - 2026-10-16 board mode: canvas with pan/zoom, free card placement, zones, Website/Board switch, last zone remembered (migration 000900); card code split into `cards.tsx`
 - `bb2adfa` CONTEXT.md + CLAUDE.md added

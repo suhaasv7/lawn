@@ -58,6 +58,13 @@ function fit(r: Rect, vw: number, vh: number): Camera {
   return { z, x: (vw - w * z) / 2 - r.x * PITCH * z, y: top + (vh - top - 40 - h * z) / 2 - r.y * PITCH * z };
 }
 
+// Camera that keeps zoom z and puts the middle of r in the middle of the view.
+function centerOn(r: Rect, vw: number, vh: number, z: number): Camera {
+  const cx = r.x * PITCH + span(r.w) / 2;
+  const cy = r.y * PITCH + span(r.h) / 2;
+  return { z, x: vw / 2 - cx * z, y: (vh + TOP) / 2 - cy * z };
+}
+
 function bounds(tiles: Tile[]): Rect | null {
   if (!tiles.length) return null;
   const x = Math.min(...tiles.map((t) => t.x ?? 0));
@@ -162,16 +169,17 @@ export default function Board({
     camRef.current = cam;
   }, [cam]);
 
-  // Where to look: the active zone, else everything.
-  const target = (): Rect => {
-    const zone = zones.find((z) => z.id === activeZoneId);
-    return zone ?? bounds(tiles) ?? { x: 0, y: 0, w: 18, h: 10 };
-  };
+  const activeZone = zones.find((z) => z.id === activeZoneId);
 
-  // First paint: jump straight there. Later zone picks (flyNonce): glide.
+  // First paint: centred on the last zone (at 100%), else everything fitted.
   useLayoutEffect(() => {
     const el = vpRef.current;
-    if (el) setCam(fit(target(), el.clientWidth, el.clientHeight));
+    if (!el) return;
+    setCam(
+      activeZone
+        ? centerOn(activeZone, el.clientWidth, el.clientHeight, 1)
+        : fit(bounds(tiles) ?? { x: 0, y: 0, w: 18, h: 10 }, el.clientWidth, el.clientHeight)
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, []);
   const mounted = useRef(false);
@@ -180,10 +188,11 @@ export default function Board({
       mounted.current = true;
       return;
     }
+    // Picking a zone pans to its centre, keeping the current zoom.
     const el = vpRef.current;
-    if (!el) return;
+    if (!el || !activeZone || !camRef.current) return;
     setAnimate(true);
-    setCam(fit(target(), el.clientWidth, el.clientHeight));
+    setCam(centerOn(activeZone, el.clientWidth, el.clientHeight, camRef.current.z));
     const t = setTimeout(() => setAnimate(false), 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fly only when asked
@@ -202,11 +211,25 @@ export default function Board({
     };
   }, [viewRef]);
 
+  // While assigning a zone: Esc cancels; hold Space to pan instead of marking.
+  const space = useRef(false);
   useEffect(() => {
     if (!drawing) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onDrawCancel();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDrawCancel();
+      if (e.code === "Space" && !(e.target as HTMLElement).closest("input, textarea")) {
+        space.current = true;
+        e.preventDefault();
+      }
+    };
+    const up = (e: KeyboardEvent) => e.code === "Space" && (space.current = false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      space.current = false;
+    };
   }, [drawing, onDrawCancel]);
 
   // Screen point → the cell under it.
@@ -244,13 +267,13 @@ export default function Board({
   // Drag empty space to pan; two fingers to pinch-zoom.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const onPointerDown = (e: React.PointerEvent) => {
-    if (drawing && e.isPrimary && camRef.current) {
+    if (drawing && e.isPrimary && e.button === 0 && !space.current && camRef.current) {
       e.currentTarget.setPointerCapture(e.pointerId);
       const c = cellAt(e.clientX, e.clientY);
       setSel({ x0: c.x, y0: c.y, x1: c.x, y1: c.y });
       return;
     }
-    if ((e.target as HTMLElement).closest("[data-card], [data-zone-ui]")) return;
+    if (!drawing && (e.target as HTMLElement).closest("[data-card], [data-zone-ui]")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     setAnimate(false);
@@ -381,7 +404,7 @@ export default function Board({
     const ghost = dragging && drag ? landing(dragging, drag.dx, drag.dy) : undefined;
     return (
       <>
-        {zones.map((z) => {
+        {(editing || drawing) && zones.map((z) => {
           const tone = TONE[z.tone] === "transparent" ? "var(--t-faint)" : TONE[z.tone];
           const active = z.id === activeZoneId;
           return (
@@ -545,7 +568,7 @@ export default function Board({
       )}
       {drawing && (
         <div className="pointer-events-none fixed top-24 left-1/2 z-10 -translate-x-1/2 rounded-theme border border-accent/50 bg-bg/85 px-3 py-1.5 text-xs text-fg backdrop-blur">
-          Drag across the grid to mark the zone · Esc to cancel
+          Drag to mark the zone · scroll or hold Space to move around · Esc to cancel
         </div>
       )}
     </div>
