@@ -23,6 +23,31 @@ export type BoardView = { center: () => { x: number; y: number } };
 const span = (cells: number) => cells * PITCH - GAP;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const inside = (t: Rect, z: Rect) => t.x >= z.x && t.y >= z.y && t.x + t.w <= z.x + z.w && t.y + t.h <= z.y + z.h;
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+export const rectOf = (t: Tile): Rect => ({ x: t.x ?? 0, y: t.y ?? 0, w: t.w, h: t.h });
+
+// Cards never overlap: the spot closest to r (searching outward ring by ring)
+// that doesn't collide with any of `others`.
+export function nearestFree(r: Rect, others: Rect[]): Rect {
+  const free = (x: number, y: number) => !others.some((o) => overlaps({ ...r, x, y }, o));
+  if (free(r.x, r.y)) return r;
+  for (let d = 1; d < 300; d++) {
+    let best: Rect | null = null;
+    let bestDist = Infinity;
+    for (let dx = -d; dx <= d; dx++) {
+      for (let dy = -d; dy <= d; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== d || !free(r.x + dx, r.y + dy)) continue;
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = { ...r, x: r.x + dx, y: r.y + dy };
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return r;
+}
 
 // Camera that fits a cell rect below the nav, leaving room above it for a zone's label.
 function fit(r: Rect, vw: number, vh: number): Camera {
@@ -82,11 +107,20 @@ function scrollsInside(target: HTMLElement | null, stop: HTMLElement, dy: number
 }
 
 type Drag = { ids: string[]; zoneId?: string; dx: number; dy: number };
+type Sel = { x0: number; y0: number; x1: number; y1: number };
+const selRect = (s: Sel): Rect => ({
+  x: Math.min(s.x0, s.x1),
+  y: Math.min(s.y0, s.y1),
+  w: Math.abs(s.x1 - s.x0) + 1,
+  h: Math.abs(s.y1 - s.y0) + 1,
+});
 
 export default function Board({
   tiles,
   zones,
   editing,
+  drawing,
+  focusZoneId,
   activeZoneId,
   flyNonce,
   viewRef,
@@ -97,10 +131,14 @@ export default function Board({
   onZoneMove,
   onZoneDelete,
   onZoneSelect,
+  onZoneDrawn,
+  onDrawCancel,
 }: {
   tiles: Tile[];
   zones: Zone[];
   editing: boolean;
+  drawing: boolean; // "Assign zone": drag across the cells to mark a zone
+  focusZoneId: string | null; // just-created zone: focus its name
   activeZoneId: string | null;
   flyNonce: number;
   viewRef: React.RefObject<BoardView | null>;
@@ -108,14 +146,17 @@ export default function Board({
   onArchive: (t: Tile) => void;
   onDelete: (t: Tile) => void;
   onZoneChange: (id: string, patch: Partial<Zone>) => void;
-  onZoneMove: (id: string, dx: number, dy: number, tileIds: string[]) => void;
+  onZoneMove: (id: string, dx: number, dy: number, placements: { id: string; x: number; y: number }[]) => void;
   onZoneDelete: (z: Zone) => void;
   onZoneSelect: (id: string) => void;
+  onZoneDrawn: (r: Rect) => void;
+  onDrawCancel: () => void;
 }) {
   const vpRef = useRef<HTMLDivElement>(null);
   const [cam, setCam] = useState<Camera | null>(null);
   const [animate, setAnimate] = useState(false);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [sel, setSel] = useState<Sel | null>(null);
   const camRef = useRef(cam);
   useEffect(() => {
     camRef.current = cam;
@@ -161,6 +202,20 @@ export default function Board({
     };
   }, [viewRef]);
 
+  useEffect(() => {
+    if (!drawing) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onDrawCancel();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawing, onDrawCancel]);
+
+  // Screen point → the cell under it.
+  const cellAt = (cx: number, cy: number) => {
+    const r = vpRef.current!.getBoundingClientRect();
+    const c = camRef.current!;
+    return { x: Math.floor((cx - r.left - c.x) / c.z / PITCH), y: Math.floor((cy - r.top - c.y) / c.z / PITCH) };
+  };
+
   // Wheel: pan, or zoom around the cursor with ctrl (trackpad pinch sends ctrl+wheel).
   useEffect(() => {
     const el = vpRef.current;
@@ -189,12 +244,23 @@ export default function Board({
   // Drag empty space to pan; two fingers to pinch-zoom.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const onPointerDown = (e: React.PointerEvent) => {
+    if (drawing && e.isPrimary && camRef.current) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const c = cellAt(e.clientX, e.clientY);
+      setSel({ x0: c.x, y0: c.y, x1: c.x, y1: c.y });
+      return;
+    }
     if ((e.target as HTMLElement).closest("[data-card], [data-zone-ui]")) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     setAnimate(false);
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (drawing && sel) {
+      const c = cellAt(e.clientX, e.clientY);
+      if (c.x !== sel.x1 || c.y !== sel.y1) setSel({ ...sel, x1: c.x, y1: c.y });
+      return;
+    }
     const p = pointers.current;
     const prev = p.get(e.pointerId);
     if (!prev) return;
@@ -216,7 +282,14 @@ export default function Board({
     }
     p.set(e.pointerId, next);
   };
-  const onPointerUp = (e: React.PointerEvent) => pointers.current.delete(e.pointerId);
+  const onPointerUp = (e: React.PointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (drawing && sel) {
+      const r = selRect(sel);
+      setSel(null);
+      if (r.w >= 2 && r.h >= 2) onZoneDrawn(r); // a tap or a one-cell sliver isn't a zone
+    }
+  };
 
   // Shared drag loop: reports the pointer's travel in board pixels.
   const track = (e: React.PointerEvent, onMove: (dx: number, dy: number) => void, onEnd: (dx: number, dy: number) => void) => {
@@ -239,42 +312,57 @@ export default function Board({
   const cells = (d: number) => Math.round(d / PITCH);
 
   // Edit mode: drag a card anywhere (snaps to cells on drop).
+  const othersThan = (ids: string[]) => tiles.filter((o) => !ids.includes(o.id)).map(rectOf);
+  // Where a dragged card lands: its snapped spot, or the nearest free one.
+  const landing = (t: Tile, dx: number, dy: number) =>
+    nearestFree({ ...rectOf(t), x: (t.x ?? 0) + cells(dx), y: (t.y ?? 0) + cells(dy) }, othersThan([t.id]));
+
   const startCardDrag = (e: React.PointerEvent, t: Tile) => {
-    if (!editing || e.button !== 0) return;
+    if (!editing || drawing || e.button !== 0) return;
     if ((e.target as HTMLElement).closest("input, textarea, button, a, select, [data-swapy-no-drag]")) return;
     track(
       e,
       (dx, dy) => setDrag({ ids: [t.id], dx, dy }),
       (dx, dy) => {
         setDrag(null);
-        if (cells(dx) || cells(dy)) onTileChange(t.id, { x: (t.x ?? 0) + cells(dx), y: (t.y ?? 0) + cells(dy) });
+        const to = landing(t, dx, dy);
+        if (to.x !== t.x || to.y !== t.y) onTileChange(t.id, { x: to.x, y: to.y });
       }
     );
   };
 
-  const startCardResize = (e: React.PointerEvent, t: Tile) => {
+  // Resizing (drag or arrow keys) stops at the first card in the way.
+  const tryResize = (t: Tile, w: number, h: number) => {
     const [mw, mh] = MIN_SIZE[t.kind];
-    const size = (dx: number, dy: number) => ({
-      w: clamp(t.w + cells(dx), mw, MAX_SPAN),
-      h: clamp(t.h + cells(dy), mh, MAX_SPAN),
-    });
-    track(
-      e,
-      (dx, dy) => onTileChange(t.id, size(dx, dy)),
-      (dx, dy) => onTileChange(t.id, size(dx, dy))
-    );
+    const next = { w: clamp(w, mw, MAX_SPAN), h: clamp(h, mh, MAX_SPAN) };
+    if (!othersThan([t.id]).some((o) => overlaps({ ...rectOf(t), ...next }, o))) onTileChange(t.id, next);
+  };
+  const startCardResize = (e: React.PointerEvent, t: Tile) => {
+    const apply = (dx: number, dy: number) => tryResize(t, t.w + cells(dx), t.h + cells(dy));
+    track(e, apply, apply);
   };
 
   // Edit mode: drag a zone by its label (its cards come along) or resize it.
   const startZoneDrag = (e: React.PointerEvent, z: Zone) => {
-    if (!editing || e.button !== 0 || (e.target as HTMLElement).closest("input, button")) return;
+    if (!editing || drawing || e.button !== 0 || (e.target as HTMLElement).closest("input, button")) return;
     const ids = tiles.filter((t) => inside({ x: t.x ?? 0, y: t.y ?? 0, w: t.w, h: t.h }, z)).map((t) => t.id);
     track(
       e,
       (dx, dy) => setDrag({ ids, zoneId: z.id, dx, dy }),
       (dx, dy) => {
         setDrag(null);
-        if (cells(dx) || cells(dy)) onZoneMove(z.id, cells(dx), cells(dy), ids);
+        const mx = cells(dx);
+        const my = cells(dy);
+        if (!mx && !my) return;
+        const placed = othersThan(ids);
+        const placements = tiles
+          .filter((t) => ids.includes(t.id))
+          .map((t) => {
+            const to = nearestFree({ ...rectOf(t), x: (t.x ?? 0) + mx, y: (t.y ?? 0) + my }, placed);
+            placed.push(to);
+            return { id: t.id, x: to.x, y: to.y };
+          });
+        onZoneMove(z.id, mx, my, placements);
       }
     );
   };
@@ -290,6 +378,7 @@ export default function Board({
   const content = useMemo(() => {
     const shift = (id: string) => (drag && drag.ids.includes(id) ? `translate(${drag.dx}px, ${drag.dy}px)` : undefined);
     const dragging = drag && !drag.zoneId ? tiles.find((t) => t.id === drag.ids[0]) : undefined;
+    const ghost = dragging && drag ? landing(dragging, drag.dx, drag.dy) : undefined;
     return (
       <>
         {zones.map((z) => {
@@ -320,6 +409,8 @@ export default function Board({
                   <input
                     aria-label="Zone name"
                     value={z.name}
+                    autoFocus={z.id === focusZoneId}
+                    onFocus={(e) => e.target.select()}
                     maxLength={40}
                     onChange={(e) => onZoneChange(z.id, { name: e.target.value })}
                     onBlur={(e) => !e.target.value.trim() && onZoneChange(z.id, { name: "Zone" })}
@@ -359,16 +450,11 @@ export default function Board({
         })}
 
         {/* Where the dragged card will land. */}
-        {dragging && (
+        {ghost && (
           <div
             aria-hidden
             className="absolute rounded-theme border border-dashed border-accent bg-accent/5"
-            style={{
-              left: ((dragging.x ?? 0) + cells(drag!.dx)) * PITCH,
-              top: ((dragging.y ?? 0) + cells(drag!.dy)) * PITCH,
-              width: span(dragging.w),
-              height: span(dragging.h),
-            }}
+            style={{ left: ghost.x * PITCH, top: ghost.y * PITCH, width: span(ghost.w), height: span(ghost.h) }}
           />
         )}
 
@@ -393,12 +479,7 @@ export default function Board({
                 onArchive={() => onArchive(t)}
                 onDelete={() => onDelete(t)}
                 onResizeStart={(e) => startCardResize(e, t)}
-                onResizeBy={(dw, dh) =>
-                  onTileChange(t.id, {
-                    w: clamp(t.w + dw, MIN_SIZE[t.kind][0], MAX_SPAN),
-                    h: clamp(t.h + dh, MIN_SIZE[t.kind][1], MAX_SPAN),
-                  })
-                }
+                onResizeBy={(dw, dh) => tryResize(t, t.w + dw, t.h + dh)}
               />
             )}
           </div>
@@ -406,7 +487,7 @@ export default function Board({
       </>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers are recreated each render but only read props/state listed here
-  }, [tiles, zones, editing, drag, activeZoneId]);
+  }, [tiles, zones, editing, drawing, drag, activeZoneId, focusZoneId]);
 
   const k = cam ? PITCH * cam.z : PITCH;
   return (
@@ -416,7 +497,7 @@ export default function Board({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      className="fixed inset-0 z-0 cursor-grab touch-none overflow-hidden active:cursor-grabbing"
+      className={`fixed inset-0 z-0 touch-none overflow-hidden ${drawing ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
       style={{
         // Faint dot at every cell corner; follows the camera.
         backgroundImage: "radial-gradient(color-mix(in oklab, var(--t-fg) 14%, transparent) 1px, transparent 1.5px)",
@@ -425,7 +506,7 @@ export default function Board({
       }}
     >
       {/* Edit mode: faint outline of every cell, like the grid view. */}
-      {editing && cam && (
+      {(editing || drawing) && cam && (
         <div
           aria-hidden
           className="board-cells pointer-events-none absolute inset-0"
@@ -444,6 +525,27 @@ export default function Board({
           }
         >
           {content}
+          {sel && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute rounded-theme border-[1.5px] border-dashed border-accent bg-accent/10"
+              style={{
+                left: selRect(sel).x * PITCH,
+                top: selRect(sel).y * PITCH,
+                width: span(selRect(sel).w),
+                height: span(selRect(sel).h),
+              }}
+            >
+              <span className="absolute top-1.5 left-1.5 rounded-theme bg-bg/80 px-1.5 py-0.5 text-[11px] text-fg [transform:scale(max(1,var(--inv-z)))] origin-top-left">
+                {selRect(sel).w}×{selRect(sel).h}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      {drawing && (
+        <div className="pointer-events-none fixed top-24 left-1/2 z-10 -translate-x-1/2 rounded-theme border border-accent/50 bg-bg/85 px-3 py-1.5 text-xs text-fg backdrop-blur">
+          Drag across the grid to mark the zone · Esc to cancel
         </div>
       )}
     </div>

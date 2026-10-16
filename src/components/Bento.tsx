@@ -19,7 +19,7 @@ import {
   FitToScreenIcon,
 } from "@hugeicons/core-free-icons";
 import { GithubIcon } from "./BrandIcons";
-import Board, { BoardView, placeMissing } from "./Board";
+import Board, { BoardView, nearestFree, placeMissing, rectOf } from "./Board";
 import {
   BTN,
   BTN_PRIMARY,
@@ -273,6 +273,8 @@ function Bento({
   const board = editable && settings.mode === "board";
   const [flyNonce, setFlyNonce] = useState(0);
   const boardView = useRef<BoardView | null>(null);
+  const [drawingZone, setDrawingZone] = useState(false);
+  const [focusZoneId, setFocusZoneId] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const swapyRef = useRef<Swapy | null>(null);
@@ -434,10 +436,12 @@ function Bento({
   const changeTile = (id: string, patch: Partial<Tile>) =>
     setTiles((prev) => prev.map((t) => (t.id === id ? ({ ...t, ...patch } as Tile) : t)));
 
-  // On the board, new cards land in the middle of the view.
+  // On the board, new cards land in the middle of the view (or the nearest free spot).
   const spot = (w: number, h: number) => {
     const c = board ? boardView.current?.center() : undefined;
-    return c ? { x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2) } : {};
+    if (!c) return {};
+    const to = nearestFree({ x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h }, visible.map(rectOf));
+    return { x: to.x, y: to.y };
   };
 
   // ── Zones (board mode)
@@ -445,19 +449,21 @@ function Bento({
     setSettings((s) => ({ ...s, zone_id: id }));
     setFlyNonce((n) => n + 1);
   };
-  const addZone = () => {
-    const c = boardView.current?.center() ?? { x: 0, y: 0 };
+  // "Assign zone": the drawn cell rectangle becomes a zone, named right away.
+  const zoneDrawn = (r: { x: number; y: number; w: number; h: number }) => {
     const id = `zone-${Date.now()}`;
-    setZones((prev) => [
-      ...prev,
-      { id, name: `Zone ${prev.length + 1}`, x: Math.round(c.x - 9), y: Math.round(c.y - 5), w: 18, h: 10, tone: "accent", position: prev.length },
-    ]);
+    setZones((prev) => [...prev, { id, name: `Zone ${prev.length + 1}`, ...r, tone: "accent", position: prev.length }]);
+    setDrawingZone(false);
+    setFocusZoneId(id);
+    setIsEditing(true);
   };
+  const cancelDraw = useCallback(() => setDrawingZone(false), []);
   const changeZone = (id: string, patch: Partial<Zone>) =>
     setZones((prev) => prev.map((z) => (z.id === id ? { ...z, ...patch } : z)));
-  const moveZone = (id: string, dx: number, dy: number, tileIds: string[]) => {
+  const moveZone = (id: string, dx: number, dy: number, placements: { id: string; x: number; y: number }[]) => {
     setZones((prev) => prev.map((z) => (z.id === id ? { ...z, x: z.x + dx, y: z.y + dy } : z)));
-    setTiles((prev) => prev.map((t) => (tileIds.includes(t.id) ? { ...t, x: (t.x ?? 0) + dx, y: (t.y ?? 0) + dy } : t)));
+    const to = new Map(placements.map((p) => [p.id, p]));
+    setTiles((prev) => prev.map((t) => (to.has(t.id) ? { ...t, x: to.get(t.id)!.x, y: to.get(t.id)!.y } : t)));
   };
   const deleteZone = (zone: Zone) => {
     if (!confirm(`Delete the "${zone.name}" zone? Its cards stay on the board.`)) return;
@@ -466,7 +472,14 @@ function Bento({
   };
 
   const setArchived = (tile: Tile, value: boolean) => {
-    setTiles((prev) => prev.map((t) => (t.id === tile.id ? { ...t, archived: value } : t)));
+    // Coming back onto the board: its old spot, or the nearest free one.
+    const back =
+      !value && tile.x != null && tile.y != null
+        ? nearestFree(rectOf(tile), visible.filter((t) => t.id !== tile.id).map(rectOf))
+        : null;
+    setTiles((prev) =>
+      prev.map((t) => (t.id === tile.id ? { ...t, archived: value, ...(back && { x: back.x, y: back.y }) } : t))
+    );
     setLayoutVersion((v) => v + 1);
   };
 
@@ -589,12 +602,15 @@ function Bento({
                 {z.name}
               </button>
             ))}
-            {editing && (
-              <button onClick={addZone} title="Add a zone in the middle of the view" className={`${BTN} border-dashed`}>
-                <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.75} />
-                Zone
-              </button>
-            )}
+            <button
+              onClick={() => setDrawingZone((v) => !v)}
+              aria-pressed={drawingZone}
+              title="Assign a zone: drag across the grid to mark it"
+              className={`${BTN} border-dashed`}
+            >
+              <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.75} />
+              Assign zone
+            </button>
           </div>
         )}
 
@@ -681,6 +697,8 @@ function Bento({
           tiles={visible}
           zones={zones}
           editing={editing}
+          drawing={drawingZone}
+          focusZoneId={focusZoneId}
           activeZoneId={settings.zone_id}
           flyNonce={flyNonce}
           viewRef={boardView}
@@ -691,6 +709,8 @@ function Bento({
           onZoneMove={moveZone}
           onZoneDelete={deleteZone}
           onZoneSelect={selectZone}
+          onZoneDrawn={zoneDrawn}
+          onDrawCancel={cancelDraw}
         />
       )}
 

@@ -144,12 +144,16 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   is one canvas. Scroll/drag empty space to pan; pinch or ctrl+scroll to zoom
   (free, 10%–250%). Cards keep their own board position (`x, y`), separate from
   the grid order; cards never placed get auto-placed first-fit in a 24-cell band.
-  Edit mode: drag cards anywhere (dashed outline shows the snap target), resize,
-  faint cell outlines. **Zones**: named dashed areas; "+ Zone" (edit mode) adds
-  one mid-view; drag a zone by its label (cards fully inside move with it),
-  resize from its corner, rename inline, delete (cards stay). Zone chips + "All"
-  in the nav fly the camera to fit; the last zone (and mode) is saved and the
-  board reopens there. Cards can overlap on the board (no collision rules yet).
+  Edit mode: drag cards anywhere (dashed outline shows where it will land),
+  resize, faint cell outlines. **Cards never overlap**: a drop lands on the
+  nearest free spot (`nearestFree`, ring search), resizing (drag or arrow keys)
+  stops at the first card in the way, and new / restored / zone-moved cards are
+  placed on the nearest free spot. **Zones**: "Assign zone" (always in board
+  mode) shows the cells and you drag a rectangle (≥2×2, live W×H label; Esc
+  cancels); it becomes "Zone N", edit mode turns on and its name is focused.
+  Drag a zone by its label (cards fully inside move with it), resize from its
+  corner, rename inline, delete (cards stay). Zone chips + "All" in the nav fly
+  the camera to fit; the last zone (and mode) is saved and the board reopens there.
 - **Saving**: autosave ~600ms after changes (tiles, zones, settings), status in nav
   (Saving…/Saved/Couldn't save). If the DB is unreachable the site shows code
   defaults read-only (so defaults can never overwrite real data).
@@ -182,6 +186,7 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 
 ## 9. Changelog (newest first)
 
+- 2026-10-16 board: "Assign zone" (drag a cell rectangle to create a zone); cards can no longer overlap (nearest-free drop/placement, resize stops at neighbours)
 - 2026-10-16 board mode: canvas with pan/zoom, free card placement, zones, Website/Board switch, last zone remembered (migration 000900); card code split into `cards.tsx`
 - `bb2adfa` CONTEXT.md + CLAUDE.md added
 - 2026-10-16 `7942c10` edit-mode cells → faint outlines
@@ -204,7 +209,7 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   integration or a manual run.
 - Grid mode: dragging swaps cards; cards can't be dropped into empty space
   (board mode allows free placement).
-- Board: cards can overlap; zones have a single tone (accent) — no colour picker yet.
+- Board: zones all use the accent tone (owner is fine with that for now).
 - Anyone who opens the site can edit (by design — single user, no login).
 - Website previews of sites that block framing (GitHub, Vercel…) fall back to a
   screenshot (microlink free tier, ~50/day per IP).
