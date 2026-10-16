@@ -9,37 +9,32 @@ import { ArrowDown01Icon, Tick01Icon } from "@hugeicons/core-free-icons";
 import type { Zone } from "@/tiles";
 import { BTN, PANEL, SECTION } from "./cards";
 
-type Option = { id: string | null; name: string };
-
 export default function ZonePicker({
   zones,
   current,
   onPick,
-  allLabel,
 }: {
   zones: Zone[];
   current: string | null;
-  onPick: (id: string | null) => void;
-  allLabel?: string; // adds a first "everything" entry (picks null)
+  onPick: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const options: Option[] = [...(allLabel ? [{ id: null, name: allLabel }] : []), ...zones];
-  const selected = options.find((o) => o.id === current) ?? (allLabel ? options[0] : undefined);
+  const selected = zones.find((z) => z.id === current);
 
   const show = () => {
-    setActive(Math.max(0, options.findIndex((o) => o.id === (selected?.id ?? current))));
+    setActive(Math.max(0, zones.findIndex((z) => z.id === current)));
     setOpen(true);
   };
   const close = (refocus = true) => {
     setOpen(false);
     if (refocus) buttonRef.current?.focus();
   };
-  const pick = (o: Option) => {
-    onPick(o.id);
+  const pick = (z: Zone) => {
+    onPick(z.id);
     close();
   };
 
@@ -53,14 +48,14 @@ export default function ZonePicker({
   }, [open]);
 
   const onKey = (e: React.KeyboardEvent) => {
-    const last = options.length - 1;
+    const last = zones.length - 1;
     const moves: Record<string, () => void> = {
       ArrowDown: () => setActive((i) => Math.min(last, i + 1)),
       ArrowUp: () => setActive((i) => Math.max(0, i - 1)),
       Home: () => setActive(0),
       End: () => setActive(last),
-      Enter: () => options[active] && pick(options[active]),
-      " ": () => options[active] && pick(options[active]),
+      Enter: () => zones[active] && pick(zones[active]),
+      " ": () => zones[active] && pick(zones[active]),
       Escape: () => close(),
       Tab: () => close(false),
     };
@@ -98,16 +93,16 @@ export default function ZonePicker({
             role="listbox"
             tabIndex={-1}
             aria-label="Zones"
-            aria-activedescendant={options[active] ? `zone-opt-${options[active].id ?? "all"}` : undefined}
+            aria-activedescendant={zones[active] ? `zone-opt-${zones[active].id}` : undefined}
             onKeyDown={onKey}
             className="m-0 flex max-h-[60dvh] list-none flex-col gap-0.5 overflow-y-auto p-0 outline-none [scrollbar-width:thin]"
           >
-            {options.map((z, i) => {
-              const isCurrent = z.id === (selected?.id ?? current);
+            {zones.map((z, i) => {
+              const isCurrent = z.id === current;
               return (
                 <li
-                  key={z.id ?? "all"}
-                  id={`zone-opt-${z.id ?? "all"}`}
+                  key={z.id}
+                  id={`zone-opt-${z.id}`}
                   role="option"
                   aria-selected={isCurrent}
                   onPointerEnter={() => setActive(i)}

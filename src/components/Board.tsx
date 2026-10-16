@@ -64,7 +64,7 @@ function centerOn(r: Rect, vw: number, vh: number, z: number): Camera {
   return { z, x: vw / 2 - cx * z, y: (vh + TOP) / 2 - cy * z };
 }
 
-function bounds(tiles: { x?: number | null; y?: number | null; w: number; h: number }[]): Rect | null {
+function bounds(tiles: Tile[]): Rect | null {
   if (!tiles.length) return null;
   const x = Math.min(...tiles.map((t) => t.x ?? 0));
   const y = Math.min(...tiles.map((t) => t.y ?? 0));
@@ -177,7 +177,7 @@ export default function Board({
     setCam(
       activeZone
         ? centerOn(activeZone, el.clientWidth, el.clientHeight, 1)
-        : fit(bounds([...tiles, ...zones]) ?? { x: 0, y: 0, w: 18, h: 10 }, el.clientWidth, el.clientHeight)
+        : fit(bounds(tiles) ?? { x: 0, y: 0, w: 18, h: 10 }, el.clientWidth, el.clientHeight)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, []);
@@ -187,18 +187,11 @@ export default function Board({
       mounted.current = true;
       return;
     }
-    // Picking a zone pans to its centre, keeping the current zoom; picking
-    // "whole board" fits everything.
+    // Picking a zone pans to its centre, keeping the current zoom.
     const el = vpRef.current;
-    if (!el || !camRef.current) return;
-    const all = bounds([...tiles, ...zones]);
-    if (!activeZone && !all) return;
+    if (!el || !activeZone || !camRef.current) return;
     setAnimate(true);
-    setCam(
-      activeZone
-        ? centerOn(activeZone, el.clientWidth, el.clientHeight, camRef.current.z)
-        : fit(all!, el.clientWidth, el.clientHeight)
-    );
+    setCam(centerOn(activeZone, el.clientWidth, el.clientHeight, camRef.current.z));
     const t = setTimeout(() => setAnimate(false), 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fly only when asked

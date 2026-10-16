@@ -284,8 +284,10 @@ function Bento({
   // Board mode: the site as a free-form canvas (only with live data).
   const board = editable && settings.mode === "board";
   const [flyNonce, setFlyNonce] = useState(0);
-  // Website mode can show one zone: just the cards whose centre is inside it.
-  const gridZone = board ? undefined : zones.find((z) => z.id === settings.zone_id);
+  // Zones are one thing, two views: the board pans to the picked zone, website
+  // mode shows only that zone's cards (centre inside it). No zones = all cards.
+  const zone = zones.find((z) => z.id === settings.zone_id) ?? zones[0];
+  const gridZone = board ? undefined : zone;
   const inGrid = (t: Tile) => !t.archived && (!gridZone || inZone(t, gridZone));
   const gridTiles = tiles.filter(inGrid);
   // Swapy's handler is created once per layout, so it reads the filter from here.
@@ -486,9 +488,7 @@ function Bento({
     setSettings((s) => ({ ...s, zone_id: id }));
     setFlyNonce((n) => n + 1);
   };
-  // From the nav: on the board, fly to the zone (null = fit the whole board);
-  // in website mode, show only that zone's cards (null = all cards).
-  const pickZone = (id: string | null) => (board ? selectZone(id) : setSettings((s) => ({ ...s, zone_id: id })));
+  const pickZone = (id: string) => (board ? selectZone(id) : setSettings((s) => ({ ...s, zone_id: id })));
   // "Assign zone": the drawn cell rectangle becomes a zone, named right away.
   const zoneDrawn = (r: { x: number; y: number; w: number; h: number }) => {
     const id = `zone-${Date.now()}`;
@@ -666,9 +666,8 @@ function Bento({
             {zones.length > 0 && (
               <ZonePicker
                 zones={zones}
-                current={settings.zone_id}
+                current={zone?.id ?? null}
                 onPick={pickZone}
-                allLabel={board ? "Whole board" : "All cards"}
               />
             )}
             {board && editing && (
