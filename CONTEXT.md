@@ -70,6 +70,7 @@ src/theme.ts            Theme/Settings types, FONTS, DEFAULT_THEME/SETTINGS, der
 src/components/Bento.tsx  the app shell: nav (mode switch, zone bar), grid (Swapy), Add / Archive / Theme Center dialogs, autosave
 src/components/cards.tsx  every card kind (TileCard, WebsiteTile, TodoTile…), TileControls (edit overlay), shared class sets/helpers
 src/components/Board.tsx  board mode: camera (pan/zoom/pinch), free card drag/resize, zones, placeMissing()
+src/components/ZonePicker.tsx  custom themed zone dropdown (listbox: keyboard, outside-click close)
 src/components/BrandIcons.tsx  GithubIcon
 supabase/migrations/    SQL history (see §5)
 supabase/config.toml    from `supabase init` (for the GitHub integration, which isn't enabled)
@@ -158,9 +159,10 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   hold Space+drag to move around while assigning, Esc cancels; it becomes
   "Zone N" with its name focused. Still in edit mode you can drag a zone by its
   label (cards fully inside move with it), resize from its corner, rename,
-  delete (cards stay). **Nav**: a Zones dropdown (only zone names, no "All");
+  delete (cards stay). **Nav**: a custom Zones dropdown (`ZonePicker`, only
+  zone names, no "All"; shown in both modes once zones exist). On the board,
   picking one pans so the zone's centre is mid-screen, keeping the current
-  zoom. The last zone (and mode) is saved; the board reopens centred on it at 100%.
+  zoom; in website mode it switches to the board, centred on that zone. The last zone (and mode) is saved; the board reopens centred on it at 100%.
 - **Backups → Notion** ("Backup" button in the nav opens the Backups dialog):
   daily via Vercel Cron (`/api/backup`, skipped if the last snapshot is <12h
   old; if `CRON_SECRET` is set only Vercel's call is accepted) and "Back up
@@ -211,6 +213,7 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 
 ## 9. Changelog (newest first)
 
+- 2026-10-16 custom themed Zones dropdown (replaces native select), also shown in website mode (picking a zone opens the board there)
 - 2026-10-16 backups to Notion: daily cron + "Back up now", snapshots (full JSON) + cards/zones mirror, restore from the Backups dialog; saveTheme is now an upsert
 - 2026-10-16 board: zones hidden outside edit mode; nav zone chips/"All" → Zones dropdown that pans to the zone's centre (zoom kept); Assign zone only while editing; Space+drag pans while assigning; reload centres last zone at 100%
 - 2026-10-16 board: "Assign zone" (drag a cell rectangle to create a zone); cards can no longer overlap (nearest-free drop/placement, resize stops at neighbours)

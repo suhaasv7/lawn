@@ -16,11 +16,11 @@ import {
   PaintBoardIcon,
   CanvasIcon,
   BrowserIcon,
-  ArrowDown01Icon,
   CloudUploadIcon,
 } from "@hugeicons/core-free-icons";
 import { GithubIcon } from "./BrandIcons";
 import Board, { BoardView, nearestFree, placeMissing, rectOf } from "./Board";
+import ZonePicker from "./ZonePicker";
 import {
   BTN,
   BTN_PRIMARY,
@@ -466,6 +466,12 @@ function Bento({
     setSettings((s) => ({ ...s, zone_id: id }));
     setFlyNonce((n) => n + 1);
   };
+  // From the nav: on the board, pan to the zone; in website mode, switch to
+  // the board (it opens centred on that zone).
+  const pickZone = (id: string) => {
+    if (board) selectZone(id);
+    else setSettings((s) => ({ ...s, mode: "board", zone_id: id }));
+  };
   // "Assign zone": the drawn cell rectangle becomes a zone, named right away.
   const zoneDrawn = (r: { x: number; y: number; w: number; h: number }) => {
     const id = `zone-${Date.now()}`;
@@ -638,36 +644,10 @@ function Bento({
           />
         </a>
 
-        {board && (
+        {editable && (zones.length > 0 || (board && editing)) && (
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            {zones.length > 0 && (
-              // Always shows the current zone; picking any zone (even the same
-              // one) pans there, because the select's real value stays "".
-              <label className="relative flex items-center">
-                <span className="sr-only">Go to zone</span>
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && selectZone(e.target.value)}
-                  className={`${BTN} max-w-[40vw] appearance-none truncate pr-8`}
-                >
-                  <option value="" hidden>
-                    {zones.find((z) => z.id === settings.zone_id)?.name ?? "Zones"}
-                  </option>
-                  {zones.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.name}
-                    </option>
-                  ))}
-                </select>
-                <HugeiconsIcon
-                  icon={ArrowDown01Icon}
-                  size={13}
-                  strokeWidth={1.75}
-                  className="pointer-events-none absolute right-2.5 text-muted"
-                />
-              </label>
-            )}
-            {editing && (
+            {zones.length > 0 && <ZonePicker zones={zones} current={settings.zone_id} onPick={pickZone} />}
+            {board && editing && (
               <button
                 onClick={() => setDrawingZone((v) => !v)}
                 aria-pressed={drawingZone}
