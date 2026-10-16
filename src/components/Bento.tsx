@@ -33,7 +33,7 @@ import {
   host,
   labelOf,
 } from "./cards";
-import { ADD_SIZE, MAX_SPAN, MIN_SIZE, TILES, SITE_NAME, Tile, Zone } from "@/tiles";
+import { ADD_SIZE, MAX_SPAN, MIN_SIZE, TILES, SITE_NAME, Tile, Zone, inZone } from "@/tiles";
 import {
   BASE_KEYS,
   BASE_LABELS,
@@ -284,6 +284,15 @@ function Bento({
   // Board mode: the site as a free-form canvas (only with live data).
   const board = editable && settings.mode === "board";
   const [flyNonce, setFlyNonce] = useState(0);
+  // Website mode can show one zone: just the cards whose centre is inside it.
+  const gridZone = board ? undefined : zones.find((z) => z.id === settings.zone_id);
+  const inGrid = (t: Tile) => !t.archived && (!gridZone || inZone(t, gridZone));
+  const gridTiles = tiles.filter(inGrid);
+  // Swapy's handler is created once per layout, so it reads the filter from here.
+  const inGridRef = useRef(inGrid);
+  useEffect(() => {
+    inGridRef.current = inGrid;
+  });
   const boardView = useRef<BoardView | null>(null);
   const [drawingZone, setDrawingZone] = useState(false);
   const [focusZoneId, setFocusZoneId] = useState<string | null>(null);
@@ -385,10 +394,11 @@ function Bento({
       flushSync(() =>
         setTiles((prev) => {
           const byId = new Map(prev.map((t) => [t.id, t]));
-          // Slots are the visible tiles only; archived ones keep their place.
-          const shown = prev.filter((t) => !t.archived).map((t, i) => byId.get(map[`slot-${i}`]) ?? t);
+          // Slots are the cards shown in the grid only; the rest keep their place.
+          const show = inGridRef.current;
+          const shown = prev.filter(show).map((t, i) => byId.get(map[`slot-${i}`]) ?? t);
           let k = 0;
-          return prev.map((t) => (t.archived ? t : shown[k++]));
+          return prev.map((t) => (show(t) ? shown[k++] : t));
         })
       );
     });
@@ -397,11 +407,11 @@ function Bento({
       swapy.destroy();
       swapyRef.current = null;
     };
-  }, [layoutVersion, board]);
+  }, [layoutVersion, board, gridZone?.id]);
 
   useEffect(() => {
     swapyRef.current?.enable(editing);
-  }, [editing, layoutVersion, board]);
+  }, [editing, layoutVersion, board, gridZone?.id]);
 
   const cols = () => getComputedStyle(containerRef.current!).gridTemplateColumns.split(" ").length;
 
@@ -453,11 +463,21 @@ function Bento({
   const changeTile = (id: string, patch: Partial<Tile>) =>
     setTiles((prev) => prev.map((t) => (t.id === id ? ({ ...t, ...patch } as Tile) : t)));
 
-  // On the board, new cards land in the middle of the view (or the nearest free spot).
+  // New cards land in the middle of the board view — or, when website mode is
+  // showing one zone, in the middle of that zone (so they appear there).
   const spot = (w: number, h: number) => {
-    const c = board ? boardView.current?.center() : undefined;
+    const c = board
+      ? boardView.current?.center()
+      : gridZone && { x: gridZone.x + gridZone.w / 2, y: gridZone.y + gridZone.h / 2 };
     if (!c) return {};
     const to = nearestFree({ x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h }, visible.map(rectOf));
+    // A full zone grows to take the card, so it still shows in the zone it was added to.
+    if (gridZone && !inZone(to, gridZone)) {
+      const x = Math.min(gridZone.x, to.x);
+      const y = Math.min(gridZone.y, to.y);
+      const grown = { x, y, w: Math.max(gridZone.x + gridZone.w, to.x + w) - x, h: Math.max(gridZone.y + gridZone.h, to.y + h) - y };
+      setZones((zs) => zs.map((z) => (z.id === gridZone.id ? { ...z, ...grown } : z)));
+    }
     return { x: to.x, y: to.y };
   };
 
@@ -466,12 +486,9 @@ function Bento({
     setSettings((s) => ({ ...s, zone_id: id }));
     setFlyNonce((n) => n + 1);
   };
-  // From the nav: on the board, pan to the zone; in website mode, switch to
-  // the board (it opens centred on that zone).
-  const pickZone = (id: string) => {
-    if (board) selectZone(id);
-    else setSettings((s) => ({ ...s, mode: "board", zone_id: id }));
-  };
+  // From the nav: on the board, fly to the zone (null = fit the whole board);
+  // in website mode, show only that zone's cards (null = all cards).
+  const pickZone = (id: string | null) => (board ? selectZone(id) : setSettings((s) => ({ ...s, zone_id: id })));
   // "Assign zone": the drawn cell rectangle becomes a zone, named right away.
   const zoneDrawn = (r: { x: number; y: number; w: number; h: number }) => {
     const id = `zone-${Date.now()}`;
@@ -646,7 +663,14 @@ function Bento({
 
         {editable && (zones.length > 0 || (board && editing)) && (
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            {zones.length > 0 && <ZonePicker zones={zones} current={settings.zone_id} onPick={pickZone} />}
+            {zones.length > 0 && (
+              <ZonePicker
+                zones={zones}
+                current={settings.zone_id}
+                onPick={pickZone}
+                allLabel={board ? "Whole board" : "All cards"}
+              />
+            )}
             {board && editing && (
               <button
                 onClick={() => setDrawingZone((v) => !v)}
@@ -768,6 +792,12 @@ function Bento({
         />
       )}
 
+      {gridZone && gridTiles.length === 0 && (
+        <p className="my-16 text-center text-sm text-muted">
+          No cards in “{gridZone.name}” yet — add one here, or move cards into it on the board.
+        </p>
+      )}
+
       {/* ── BENTO GRID: square cells, tiles span w x h of them ── */}
       {!board && (
       <div className="bento-wrap w-full">
@@ -776,7 +806,7 @@ function Bento({
           onPointerMove={trackPointer}
           className={`bento-grid${editing ? " editing" : ""}${entering ? " entering" : ""}`}
         >
-          {visible.map((tile, i) => (
+          {gridTiles.map((tile, i) => (
             <div
               key={`slot-${i}`}
               data-swapy-slot={`slot-${i}`}

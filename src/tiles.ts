@@ -57,6 +57,14 @@ export type Tile =
 // A named area of the board (cells). Cards fully inside it move with it.
 export type Zone = { id: string; name: string; x: number; y: number; w: number; h: number; tone: Tone; position: number };
 
+// A card belongs to a zone when its centre is inside it (board cells).
+export const inZone = (t: { x?: number | null; y?: number | null; w: number; h: number }, z: Zone) => {
+  if (t.x == null || t.y == null) return false;
+  const cx = t.x + t.w / 2;
+  const cy = t.y + t.h / 2;
+  return cx > z.x && cx < z.x + z.w && cy > z.y && cy < z.y + z.h;
+};
+
 export const SITE_NAME = "suhaas";
 
 export const TILES: Tile[] = [

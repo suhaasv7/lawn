@@ -159,10 +159,15 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
   hold Space+drag to move around while assigning, Esc cancels; it becomes
   "Zone N" with its name focused. Still in edit mode you can drag a zone by its
   label (cards fully inside move with it), resize from its corner, rename,
-  delete (cards stay). **Nav**: a custom Zones dropdown (`ZonePicker`, only
-  zone names, no "All"; shown in both modes once zones exist). On the board,
-  picking one pans so the zone's centre is mid-screen, keeping the current
-  zoom; in website mode it switches to the board, centred on that zone. The last zone (and mode) is saved; the board reopens centred on it at 100%.
+  delete (cards stay). **Nav**: a custom Zones dropdown (`ZonePicker`, shown
+  in both modes once zones exist). A card belongs to a zone when its centre is
+  inside it (`inZone` in `tiles.ts`, used by board, website view and Notion).
+  On the board: "Whole board" fits everything (cards + zones); a zone pans so
+  its centre is mid-screen, keeping the current zoom. In website mode: "All
+  cards", or a zone shows only that zone's cards in the grid (swap/resize work
+  in that view; a card added there lands in the zone, which grows if it's
+  full). Both modes share `settings.zone_id`, so the last pick is saved and
+  restored; the board reopens centred on it at 100%.
 - **Backups → Notion** ("Backup" button in the nav opens the Backups dialog):
   daily via Vercel Cron (`/api/backup`, skipped if the last snapshot is <12h
   old; if `CRON_SECRET` is set only Vercel's call is accepted) and "Back up
@@ -213,6 +218,7 @@ hasn't enabled it. Validate SQL locally in PGlite before applying (§8). Note
 
 ## 9. Changelog (newest first)
 
+- 2026-10-16 zones viewable in both modes: website mode filters the grid to a zone ("All cards" for everything), board gets "Whole board" (fit all); fixed Swapy crash when swapping a website card (iframe now always rendered)
 - 2026-10-16 custom themed Zones dropdown (replaces native select), also shown in website mode (picking a zone opens the board there)
 - 2026-10-16 backups to Notion: daily cron + "Back up now", snapshots (full JSON) + cards/zones mirror, restore from the Backups dialog; saveTheme is now an upsert
 - 2026-10-16 board: zones hidden outside edit mode; nav zone chips/"All" → Zones dropdown that pans to the zone's centre (zoom kept); Assign zone only while editing; Space+drag pans while assigning; reload centres last zone at 100%

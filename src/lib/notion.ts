@@ -4,7 +4,7 @@
 // inline databases: "lawn snapshots" (each row holds a full JSON copy of the
 // site), and "lawn cards" / "lawn zones" (a readable mirror of the board).
 import { createHash } from "node:crypto";
-import type { Zone } from "@/tiles";
+import { inZone, type Zone } from "@/tiles";
 import type { Settings, Theme } from "@/theme";
 
 const TOKEN = process.env.NOTION_TOKEN;
@@ -214,8 +214,6 @@ async function sync(db: string, keyProp: string, items: { key: string; props: Re
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-const inside = (t: TileRow, z: Zone) =>
-  t.x != null && t.y != null && t.x >= z.x && t.y >= z.y && t.x + t.w <= z.x + z.w && t.y + t.h <= z.y + z.h;
 
 function cardRow(t: TileRow, zones: Zone[]) {
   const p = t.props;
@@ -232,7 +230,7 @@ function cardRow(t: TileRow, zones: Zone[]) {
     Kind: { select: { name: t.kind } },
     URL: { url: /^https?:\/\//.test(url) ? url : null },
     Size: { rich_text: text(`${t.w}×${t.h}`) },
-    Zone: { rich_text: text(zones.find((z) => inside(t, z))?.name ?? "") },
+    Zone: { rich_text: text(zones.find((z) => inZone(t, z))?.name ?? "") },
     Archived: { checkbox: t.archived },
     Position: { number: t.position ?? null },
     Content: { rich_text: text(content) },

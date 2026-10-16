@@ -215,19 +215,23 @@ function WebsiteTile({
     >
       {embed ? (
         <div className="relative h-full">
-          {boxW > 0 && (
-            <iframe
-              key={tile.view ?? "desktop"}
-              src={tile.url}
-              title={`${tile.title} (${site})`}
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              tabIndex={interactive ? 0 : -1}
-              style={{ width: viewW, height: viewH, transform: `scale(${scale})`, transformOrigin: "0 0" }}
-              className={`absolute top-0 left-0 border-0 ${interactive ? "" : "pointer-events-none"}`}
-            />
-          )}
+          {/* Always rendered (hidden until measured): a remounted card must keep
+              the same DOM shape, or Swapy's swap animation throws. */}
+          <iframe
+            key={tile.view ?? "desktop"}
+            src={tile.url}
+            title={`${tile.title} (${site})`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            tabIndex={interactive ? 0 : -1}
+            style={
+              boxW > 0
+                ? { width: viewW, height: viewH, transform: `scale(${scale})`, transformOrigin: "0 0" }
+                : { visibility: "hidden" }
+            }
+            className={`absolute top-0 left-0 border-0 ${interactive ? "" : "pointer-events-none"}`}
+          />
         </div>
       ) : (
         // absolute img: a 2560px screenshot must not stretch the grid row

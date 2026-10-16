@@ -7,7 +7,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowExpandDiagonal01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
-import { MAX_SPAN, MIN_SIZE, Tile, Zone } from "@/tiles";
+import { MAX_SPAN, MIN_SIZE, Tile, Zone, inZone } from "@/tiles";
 import { CTL_BTN, SECTION, TONE, TileCard, TileControls } from "./cards";
 
 export const PITCH = 68; // 56px cell + 12px gap
@@ -22,7 +22,6 @@ export type BoardView = { center: () => { x: number; y: number } };
 
 const span = (cells: number) => cells * PITCH - GAP;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const inside = (t: Rect, z: Rect) => t.x >= z.x && t.y >= z.y && t.x + t.w <= z.x + z.w && t.y + t.h <= z.y + z.h;
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 export const rectOf = (t: Tile): Rect => ({ x: t.x ?? 0, y: t.y ?? 0, w: t.w, h: t.h });
 
@@ -65,7 +64,7 @@ function centerOn(r: Rect, vw: number, vh: number, z: number): Camera {
   return { z, x: vw / 2 - cx * z, y: (vh + TOP) / 2 - cy * z };
 }
 
-function bounds(tiles: Tile[]): Rect | null {
+function bounds(tiles: { x?: number | null; y?: number | null; w: number; h: number }[]): Rect | null {
   if (!tiles.length) return null;
   const x = Math.min(...tiles.map((t) => t.x ?? 0));
   const y = Math.min(...tiles.map((t) => t.y ?? 0));
@@ -178,7 +177,7 @@ export default function Board({
     setCam(
       activeZone
         ? centerOn(activeZone, el.clientWidth, el.clientHeight, 1)
-        : fit(bounds(tiles) ?? { x: 0, y: 0, w: 18, h: 10 }, el.clientWidth, el.clientHeight)
+        : fit(bounds([...tiles, ...zones]) ?? { x: 0, y: 0, w: 18, h: 10 }, el.clientWidth, el.clientHeight)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, []);
@@ -188,11 +187,18 @@ export default function Board({
       mounted.current = true;
       return;
     }
-    // Picking a zone pans to its centre, keeping the current zoom.
+    // Picking a zone pans to its centre, keeping the current zoom; picking
+    // "whole board" fits everything.
     const el = vpRef.current;
-    if (!el || !activeZone || !camRef.current) return;
+    if (!el || !camRef.current) return;
+    const all = bounds([...tiles, ...zones]);
+    if (!activeZone && !all) return;
     setAnimate(true);
-    setCam(centerOn(activeZone, el.clientWidth, el.clientHeight, camRef.current.z));
+    setCam(
+      activeZone
+        ? centerOn(activeZone, el.clientWidth, el.clientHeight, camRef.current.z)
+        : fit(all!, el.clientWidth, el.clientHeight)
+    );
     const t = setTimeout(() => setAnimate(false), 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fly only when asked
@@ -368,7 +374,7 @@ export default function Board({
   // Edit mode: drag a zone by its label (its cards come along) or resize it.
   const startZoneDrag = (e: React.PointerEvent, z: Zone) => {
     if (!editing || drawing || e.button !== 0 || (e.target as HTMLElement).closest("input, button")) return;
-    const ids = tiles.filter((t) => inside({ x: t.x ?? 0, y: t.y ?? 0, w: t.w, h: t.h }, z)).map((t) => t.id);
+    const ids = tiles.filter((t) => inZone(t, z)).map((t) => t.id);
     track(
       e,
       (dx, dy) => setDrag({ ids, zoneId: z.id, dx, dy }),
